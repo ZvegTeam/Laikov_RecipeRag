@@ -16,7 +16,10 @@
     "supabase:reset": "supabase db reset",
     "supabase:migrate": "supabase db reset",
     "supabase:init": "supabase init",
-    "parse:json": "bun scripts/parse-json.ts"
+    "parse:json": "bun scripts/parse-json.ts",
+    "vectorize:local": "USE_LOCAL_SUPABASE=true bun scripts/vectorize-data.ts",
+    "vectorize:remote": "USE_REMOTE_SUPABASE=true bun scripts/vectorize-data.ts",
+    "vectorize": "bun scripts/vectorize-data.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

@@ -84,11 +84,18 @@ rag-ai/
   - [x] Handle missing fields gracefully
 
 #### 2.2 Vectorization Strategy
-- [ ] Create embedding generation function using Gemini:
-  - Use Gemini's `embedding-001` or `text-embedding-004` model
-  - Embedding text should combine: `name + " " + ingredients + " " + description`
-  - Batch process recipes (e.g., 100 at a time) to avoid rate limits
-  - Store embeddings in Supabase
+- [x] Create embedding generation function using Gemini (`lib/gemini.ts`):
+  - [x] Use Gemini's `text-embedding-004` model (configurable)
+  - [x] Embedding text combines: `name + ". Ingredients: " + ingredients + ". " + description`
+  - [x] Batch process recipes (configurable batch size, default 10) to avoid rate limits
+  - [x] Store embeddings in Supabase via vectorize-data script
+- [x] Create data migration script (`scripts/vectorize-data.ts`):
+  - [x] Supports both local and remote Supabase (configurable via USE_LOCAL_SUPABASE or USE_REMOTE_SUPABASE env vars)
+  - [x] Read parsed JSON file
+  - [x] Generate embeddings for each recipe
+  - [x] Insert into Supabase with embeddings
+  - [x] Progress tracking and error handling
+  - [x] Configurable batch sizes for embeddings and database inserts
 
 #### 2.3 Data Migration Script
 - [ ] Create Node.js script (`scripts/vectorize-data.ts`):
