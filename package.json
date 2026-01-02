@@ -15,7 +15,8 @@
     "supabase:status": "supabase status",
     "supabase:reset": "supabase db reset",
     "supabase:migrate": "supabase db reset",
-    "supabase:init": "supabase init"
+    "supabase:init": "supabase init",
+    "parse:json": "bun scripts/parse-json.ts"
   },
   "dependencies": {
     "react": "^18.3.1",

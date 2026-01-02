@@ -58,14 +58,14 @@ rag-ai/
 - [x] Create Supabase client utilities (`lib/supabase.ts`)
 - [x] Create setup documentation (`supabase/README.md`)
 - [x] Create environment variable example file
-- [ ] **Manual step**: Create Supabase project at supabase.com
-- [ ] **Manual step**: Run SQL migrations in Supabase SQL Editor:
+- [x] **Manual step**: Create Supabase project at supabase.com
+- [x] **Manual step**: Run SQL migrations in Supabase SQL Editor:
   - Run `supabase/setup.sql` (complete setup) OR
   - Run migrations in order: `001_enable_pgvector.sql`, `002_create_recipes_table.sql`
-- [ ] **Manual step**: Get API keys from Supabase project settings
+- [x] **Manual step**: Get API keys from Supabase project settings
 
 #### 1.3 Environment Variables
-- [ ] Create `.env.local`:
+- [x] Create `.env.local`:
   ```
   NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
   NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
@@ -76,12 +76,12 @@ rag-ai/
 ### Phase 2: Data Processing & Vectorization
 
 #### 2.1 Parse JSON Data
-- [ ] Create script to parse MongoDB-style JSON file
-- [ ] Extract and normalize recipe data:
-  - Convert MongoDB ObjectId to string
-  - Parse date fields
-  - Clean and normalize ingredient text
-  - Handle missing fields gracefully
+- [x] Create script to parse MongoDB-style JSON file (`scripts/parse-json.ts`)
+- [x] Extract and normalize recipe data:
+  - [x] Convert MongoDB ObjectId to string
+  - [x] Parse date fields
+  - [x] Clean and normalize ingredient text
+  - [x] Handle missing fields gracefully
 
 #### 2.2 Vectorization Strategy
 - [ ] Create embedding generation function using Gemini:
