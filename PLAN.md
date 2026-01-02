@@ -47,45 +47,22 @@ rag-ai/
 - [x] Create Next.js 14+ project with TypeScript
 - [x] Setup Biome for linting and formatting
 - [x] Initialize Git repository
-- [ ] Install dependencies using Bun:
-  - `@mantine/core`, `@mantine/hooks`, `@mantine/form`
-  - `@supabase/supabase-js`
-  - `@google/generative-ai` (Gemini SDK)
-  - `zod` (for validation)
+- [x] Install dependencies using Bun:
+  - [x] `@mantine/core`, `@mantine/hooks`, `@mantine/form`
+  - [x] `@supabase/supabase-js`
+  - [x] `@google/generative-ai` (Gemini SDK)
+  - [x] `zod` (for validation)
 
 #### 1.2 Setup Supabase
-- [ ] Create Supabase project
-- [ ] Enable pgvector extension in Supabase SQL editor:
-  ```sql
-  CREATE EXTENSION IF NOT EXISTS vector;
-  ```
-- [ ] Create recipes table with vector column:
-  ```sql
-  CREATE TABLE recipes (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    original_id TEXT UNIQUE,
-    name TEXT NOT NULL,
-    ingredients TEXT NOT NULL,
-    description TEXT,
-    url TEXT,
-    image TEXT,
-    cook_time TEXT,
-    prep_time TEXT,
-    recipe_yield TEXT,
-    date_published DATE,
-    source TEXT,
-    embedding vector(768), -- Gemini embedding dimension
-    cooking_instructions TEXT, -- Detailed cooking process
-    additional_info JSONB, -- Additional recipe info (tips, variations, etc.)
-    instructions_fetched_at TIMESTAMP, -- When instructions were last fetched
-    created_at TIMESTAMP DEFAULT NOW(),
-    updated_at TIMESTAMP DEFAULT NOW()
-  );
-
-  -- Create index for vector similarity search
-  CREATE INDEX ON recipes USING ivfflat (embedding vector_cosine_ops)
-  WITH (lists = 100);
-  ```
+- [x] Create SQL migration files for database setup
+- [x] Create Supabase client utilities (`lib/supabase.ts`)
+- [x] Create setup documentation (`supabase/README.md`)
+- [x] Create environment variable example file
+- [ ] **Manual step**: Create Supabase project at supabase.com
+- [ ] **Manual step**: Run SQL migrations in Supabase SQL Editor:
+  - Run `supabase/setup.sql` (complete setup) OR
+  - Run migrations in order: `001_enable_pgvector.sql`, `002_create_recipes_table.sql`
+- [ ] **Manual step**: Get API keys from Supabase project settings
 
 #### 1.3 Environment Variables
 - [ ] Create `.env.local`:
