@@ -43,7 +43,3 @@ next-env.d.ts
 /.supabase
 supabase/.branches
 supabase/.temp
-
-# parsed data files
-recipes-parsed.json
-
