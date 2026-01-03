@@ -1,12 +1,14 @@
 # Recipe Search Application - Implementation Plan
 
 ## Overview
-A web application that allows users to find recipes based on a list of ingredients using vector similarity search powered by pgvector and Gemini AI embeddings.
+A web application that allows users to find recipes based on a list of ingredients using vector similarity search powered by pgvector and local transformer embeddings.
 
 ## Tech Stack
 - **Frontend**: Next.js 14+ (App Router) + Mantine UI
 - **Backend**: Supabase (PostgreSQL with pgvector extension)
-- **AI/Embeddings**: Google Gemini AI (for generating embeddings)
+- **AI/Embeddings**: @xenova/transformers (local embedding generation, no API calls)
+- **Package Manager**: Bun
+- **Linter/Formatter**: Biome (with pre-commit hooks)
 - **Data**: JSON file with recipe objects
 
 ## Project Structure
@@ -50,7 +52,7 @@ rag-ai/
 - [x] Install dependencies using Bun:
   - [x] `@mantine/core`, `@mantine/hooks`, `@mantine/form`
   - [x] `@supabase/supabase-js`
-  - [x] `@google/generative-ai` (Gemini SDK)
+  - [x] `@xenova/transformers` (for local embedding generation)
   - [x] `zod` (for validation)
 
 #### 1.2 Setup Supabase
@@ -84,11 +86,14 @@ rag-ai/
   - [x] Handle missing fields gracefully
 
 #### 2.2 Vectorization Strategy
-- [x] Create embedding generation function using Gemini (`lib/gemini.ts`):
-  - [x] Use Gemini's `text-embedding-004` model (configurable)
+- [x] Create embedding generation function using local transformers (`lib/embeddings.ts`):
+  - [x] Use @xenova/transformers for local embedding generation (no API calls)
+  - [x] Default model: `Xenova/all-MiniLM-L6-v2` (384 dimensions, fast and lightweight)
+  - [x] Support for multiple models (all-MiniLM-L6-v2, all-mpnet-base-v2, etc.)
   - [x] Embedding text combines: `name + ". Ingredients: " + ingredients + ". " + description`
-  - [x] Batch process recipes (configurable batch size, default 10) to avoid rate limits
+  - [x] Batch process recipes (configurable batch size, default 32) - no rate limits with local processing
   - [x] Store embeddings in Supabase via vectorize-data script
+  - [x] Update database schema to use 384 dimensions (default model)
 - [x] Create data migration script (`scripts/vectorize-data.ts`):
   - [x] Supports both local and remote Supabase (configurable via USE_LOCAL_SUPABASE or USE_REMOTE_SUPABASE env vars)
   - [x] Read parsed JSON file

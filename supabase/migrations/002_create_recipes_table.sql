@@ -12,7 +12,7 @@ CREATE TABLE IF NOT EXISTS recipes (
   recipe_yield TEXT,
   date_published DATE,
   source TEXT,
-  embedding vector(768), -- Gemini embedding dimension (verify actual dimension)
+  embedding vector(384), -- Local transformer embedding dimension (Xenova/all-MiniLM-L6-v2)
   cooking_instructions TEXT, -- Detailed cooking process
   additional_info JSONB, -- Additional recipe info (tips, variations, etc.)
   instructions_fetched_at TIMESTAMP, -- When instructions were last fetched

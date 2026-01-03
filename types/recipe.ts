@@ -29,6 +29,6 @@ export interface ParsedRecipe {
   cook_time?: string;
   prep_time?: string;
   recipe_yield?: string;
-  date_published?: Date;
+  date_published?: string;
   source?: string;
 }

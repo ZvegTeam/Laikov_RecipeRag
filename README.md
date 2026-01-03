@@ -106,7 +106,8 @@ SUPABASE_SERVICE_ROLE_KEY=<from supabase status>
 
 **For production**, get these values from:
 - **Supabase**: Project Settings → API
-- **Gemini**: [Google AI Studio](https://makersuite.google.com/app/apikey)
+
+Note: Embeddings are generated locally using @xenova/transformers - no external API keys needed!
 
 ## Scripts
 

@@ -2,11 +2,17 @@
 /**
  * Vectorize and upload recipe data to Supabase
  * Supports both local and remote Supabase instances
+ * Processes in batches: generates embeddings and inserts immediately
+ * Skips already processed recipes to allow resuming
  */
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { generateEmbeddingsBatch, prepareTextForEmbedding } from "../lib/gemini";
+import {
+  generateEmbeddingsBatch,
+  getEmbeddingDimension,
+  prepareTextForEmbedding,
+} from "../lib/embeddings";
 import { createSupabaseServerClient } from "../lib/supabase";
 import type { ParsedRecipe } from "../types/recipe";
 
@@ -72,66 +78,81 @@ function getSupabaseConfig(): SupabaseConfig {
 }
 
 /**
- * Insert recipes with embeddings into Supabase
+ * Fetch already inserted recipe IDs from Supabase
  */
-async function insertRecipes(
-  recipes: RecipeWithEmbedding[],
-  batchSize = 100
-): Promise<{ success: number; failed: number }> {
-  const config = getSupabaseConfig();
+async function getExistingRecipeIds(): Promise<Set<string>> {
   const supabase = createSupabaseServerClient();
+  const existingIds = new Set<string>();
 
-  let success = 0;
-  let failed = 0;
+  console.log("Checking for existing recipes in database...");
 
-  console.log(`\nInserting ${recipes.length} recipes into Supabase...`);
-  console.log(`  URL: ${config.url}`);
-  console.log(`  Mode: ${config.isLocal ? "Local" : "Remote"}`);
-  console.log(`  Batch size: ${batchSize}`);
+  let offset = 0;
+  const limit = 1000;
+  let hasMore = true;
 
-  // Process in batches
-  for (let i = 0; i < recipes.length; i += batchSize) {
-    const batch = recipes.slice(i, i + batchSize);
+  while (hasMore) {
+    const { data, error } = await supabase
+      .from("recipes")
+      .select("original_id")
+      .range(offset, offset + limit - 1);
 
-    try {
-      // Prepare data for insertion
-      const insertData = batch.map((recipe) => ({
-        original_id: recipe.original_id,
-        name: recipe.name,
-        ingredients: recipe.ingredients,
-        description: recipe.description,
-        url: recipe.url,
-        image: recipe.image,
-        cook_time: recipe.cook_time,
-        prep_time: recipe.prep_time,
-        recipe_yield: recipe.recipe_yield,
-        date_published: recipe.date_published?.toISOString().split("T")[0] || null,
-        source: recipe.source,
-        embedding: recipe.embedding || null,
-      }));
+    if (error) {
+      console.warn(`Warning: Error fetching existing recipes: ${error.message}`);
+      break;
+    }
 
-      // Insert batch
-      const { error } = await supabase.from("recipes").upsert(insertData, {
-        onConflict: "original_id",
-        ignoreDuplicates: false,
-      });
-
-      if (error) {
-        console.error(`Error inserting batch ${i / batchSize + 1}:`, error.message);
-        failed += batch.length;
-      } else {
-        success += batch.length;
-        console.log(
-          `  ✓ Inserted batch ${i / batchSize + 1}: ${batch.length} recipes (${success} total)`
-        );
+    if (data && data.length > 0) {
+      for (const row of data) {
+        if (row.original_id) {
+          existingIds.add(row.original_id);
+        }
       }
-    } catch (error) {
-      console.error(`Error processing batch ${i / batchSize + 1}:`, error);
-      failed += batch.length;
+      offset += limit;
+      hasMore = data.length === limit;
+    } else {
+      hasMore = false;
     }
   }
 
-  return { success, failed };
+  console.log(`Found ${existingIds.size} existing recipes in database\n`);
+  return existingIds;
+}
+
+/**
+ * Insert a batch of recipes with embeddings into Supabase
+ */
+async function insertRecipeBatch(
+  recipes: RecipeWithEmbedding[]
+): Promise<{ success: number; failed: number }> {
+  const supabase = createSupabaseServerClient();
+
+  // Prepare data for insertion
+  const insertData = recipes.map((recipe) => ({
+    original_id: recipe.original_id,
+    name: recipe.name,
+    ingredients: recipe.ingredients,
+    description: recipe.description,
+    url: recipe.url,
+    image: recipe.image,
+    cook_time: recipe.cook_time,
+    prep_time: recipe.prep_time,
+    recipe_yield: recipe.recipe_yield,
+    date_published: recipe.date_published?.split("T")[0] ?? null,
+    source: recipe.source,
+    embedding: recipe.embedding || null,
+  }));
+
+  // Insert batch
+  const { error } = await supabase.from("recipes").upsert(insertData, {
+    onConflict: "original_id",
+    ignoreDuplicates: false,
+  });
+
+  if (error) {
+    return { success: 0, failed: recipes.length };
+  }
+
+  return { success: recipes.length, failed: 0 };
 }
 
 /**
@@ -144,7 +165,7 @@ async function main() {
   const embeddingBatchSize = Number.parseInt(args[2] || "10", 10);
   const skipEmbeddings = args.includes("--skip-embeddings");
   const embeddingModel =
-    args.find((arg) => arg.startsWith("--model="))?.split("=")[1] || "text-embedding-004";
+    args.find((arg) => arg.startsWith("--model="))?.split("=")[1] || "Xenova/all-MiniLM-L6-v2";
 
   console.log("=".repeat(60));
   console.log("Recipe Vectorization & Upload Script");
@@ -153,6 +174,7 @@ async function main() {
   console.log(`Batch size: ${batchSize}`);
   console.log(`Embedding batch size: ${embeddingBatchSize}`);
   console.log(`Embedding model: ${embeddingModel}`);
+  console.log(`Embedding dimension: ${getEmbeddingDimension(embeddingModel)}`);
   console.log(`Skip embeddings: ${skipEmbeddings}`);
   console.log("=".repeat(60));
   console.log();
@@ -163,38 +185,91 @@ async function main() {
   const recipes: ParsedRecipe[] = JSON.parse(recipesData);
   console.log(`Loaded ${recipes.length} recipes\n`);
 
-  // Generate embeddings if not skipped
-  let recipesWithEmbeddings: RecipeWithEmbedding[] = recipes;
+  // Get existing recipe IDs to skip
+  const existingIds = await getExistingRecipeIds();
 
-  if (!skipEmbeddings) {
-    console.log("Generating embeddings...");
-    const texts = recipes.map((recipe) => prepareTextForEmbedding(recipe));
-    const embeddings = await generateEmbeddingsBatch(texts, embeddingModel, embeddingBatchSize);
+  // Filter out already processed recipes
+  const recipesToProcess = recipes.filter((recipe) => !existingIds.has(recipe.original_id));
 
-    if (embeddings.length !== recipes.length) {
-      console.warn(
-        `Warning: Generated ${embeddings.length} embeddings for ${recipes.length} recipes. Some recipes will be inserted without embeddings.`
-      );
-    }
-
-    recipesWithEmbeddings = recipes.map((recipe, index) => ({
-      ...recipe,
-      embedding: embeddings[index] || undefined,
-    }));
-
-    console.log(`✓ Generated ${embeddings.length} embeddings\n`);
-  } else {
-    console.log("Skipping embedding generation\n");
+  if (recipesToProcess.length === 0) {
+    console.log("All recipes are already in the database. Nothing to process.");
+    return;
   }
 
-  // Insert into Supabase
-  const result = await insertRecipes(recipesWithEmbeddings, batchSize);
+  console.log(
+    `Processing ${recipesToProcess.length} new recipes (skipping ${existingIds.size} existing)\n`
+  );
+
+  // Initialize counters
+  let totalSuccess = 0;
+  let totalFailed = 0;
+  const totalSkipped = existingIds.size;
+
+  // Process in batches: generate embeddings and insert immediately
+  const config = getSupabaseConfig();
+  console.log(`Processing mode: ${config.isLocal ? "Local" : "Remote"}`);
+  console.log(`Batch size: ${batchSize} recipes per batch\n`);
+
+  for (let i = 0; i < recipesToProcess.length; i += batchSize) {
+    const batch = recipesToProcess.slice(i, i + batchSize);
+    const batchNumber = Math.floor(i / batchSize) + 1;
+    const totalBatches = Math.ceil(recipesToProcess.length / batchSize);
+
+    console.log(`\n[Batch ${batchNumber}/${totalBatches}] Processing ${batch.length} recipes...`);
+
+    try {
+      // Generate embeddings for this batch
+      let batchWithEmbeddings: RecipeWithEmbedding[] = batch;
+
+      if (!skipEmbeddings) {
+        const texts = batch.map((recipe) => prepareTextForEmbedding(recipe));
+        const embeddings = await generateEmbeddingsBatch(texts, embeddingModel, embeddingBatchSize);
+
+        batchWithEmbeddings = batch.map((recipe, index) => ({
+          ...recipe,
+          embedding: embeddings[index] || undefined,
+        }));
+
+        console.log(`  ✓ Generated ${embeddings.length} embeddings for batch ${batchNumber}`);
+      } else {
+        console.log(`  ⏭ Skipping embedding generation for batch ${batchNumber}`);
+      }
+
+      // Immediately insert this batch
+      const result = await insertRecipeBatch(batchWithEmbeddings);
+
+      if (result.failed > 0) {
+        console.error(`  ✗ Failed to insert ${result.failed} recipes from batch ${batchNumber}`);
+      } else {
+        console.log(`  ✓ Inserted ${result.success} recipes from batch ${batchNumber}`);
+      }
+
+      totalSuccess += result.success;
+      totalFailed += result.failed;
+    } catch (error) {
+      console.error(`  ✗ Error processing batch ${batchNumber}:`, error);
+      totalFailed += batch.length;
+    }
+
+    // Progress summary
+    const processed = Math.min(i + batchSize, recipesToProcess.length);
+    console.log(
+      `  Progress: ${processed}/${recipesToProcess.length} recipes processed (${totalSuccess} inserted, ${totalFailed} failed)`
+    );
+  }
+
+  const result = {
+    success: totalSuccess,
+    failed: totalFailed,
+    skipped: totalSkipped,
+  };
 
   console.log(`\n${"=".repeat(60)}`);
   console.log("Upload Complete");
   console.log("=".repeat(60));
   console.log(`✓ Successfully inserted: ${result.success}`);
   console.log(`✗ Failed: ${result.failed}`);
+  console.log(`⏭ Skipped (already exists): ${result.skipped}`);
   console.log("=".repeat(60));
 }
 
@@ -206,4 +281,4 @@ if (import.meta.main) {
   });
 }
 
-export { insertRecipes, getSupabaseConfig };
+export { insertRecipeBatch, getSupabaseConfig, getExistingRecipeIds };

@@ -89,36 +89,49 @@ bun scripts/vectorize-data.ts [input_file] [batch_size] [embedding_batch_size] [
 
 **Options:**
 - `--skip-embeddings` - Skip embedding generation (useful for testing or if embeddings already exist)
-- `--model=<model_name>` - Gemini embedding model to use (default: `text-embedding-004`)
+- `--model=<model_name>` - Local transformer model to use (default: `Xenova/all-MiniLM-L6-v2`)
+  
+  Available models:
+  - `Xenova/all-MiniLM-L6-v2` (384 dims) - Fast, lightweight, default
+  - `Xenova/all-mpnet-base-v2` (768 dims) - Better quality, slower
+  - `Xenova/all-MiniLM-L12-v2` (384 dims) - Better than L6, still fast
+  - `Xenova/paraphrase-multilingual-MiniLM-L12-v2` (384 dims) - Multilingual support
 
 ### Examples
 
 ```bash
-# Basic usage with defaults
+# Basic usage with defaults (uses Xenova/all-MiniLM-L6-v2, 384 dimensions)
 bun run vectorize:local
 
 # Custom batch sizes
-bun run vectorize:local recipes-parsed.json 50 5
+bun run vectorize:local recipes-parsed.json 50 32
 
 # Skip embeddings (only upload data)
-bun run vectorize:local recipes-parsed.json 100 10 --skip-embeddings
+bun run vectorize:local recipes-parsed.json 100 32 --skip-embeddings
 
-# Use different embedding model
-bun run vectorize:local recipes-parsed.json 100 10 --model=embedding-001
+# Use different embedding model (768 dimensions - requires schema update)
+bun run vectorize:local recipes-parsed.json 100 32 --model=Xenova/all-mpnet-base-v2
 
 # Upload to remote Supabase
-bun run vectorize:remote recipes-parsed.json 200 20
+bun run vectorize:remote recipes-parsed.json 200 32
 ```
 
 ### Performance Tips
 
-1. **Embedding Batch Size**: Start with 10 and increase if you have higher rate limits. Too high may cause rate limit errors.
+1. **Embedding Batch Size**: Default is 32 for local transformers (no API rate limits). Can increase to 64-128 for faster processing if you have enough memory.
 
 2. **Database Batch Size**: 100 is a good default. Increase for faster uploads, decrease if you encounter connection issues.
 
 3. **Skip Embeddings**: Use `--skip-embeddings` if you only want to upload recipe data without embeddings (e.g., for testing).
 
 4. **Resume Capability**: The script uses `upsert` with `original_id` as the conflict key, so you can safely re-run it if it fails partway through.
+
+5. **Model Selection**: 
+   - `all-MiniLM-L6-v2` (default): Fast, 384 dimensions, good for most use cases
+   - `all-mpnet-base-v2`: Better quality, 768 dimensions, requires schema update
+   - First run downloads the model (~90MB), subsequent runs use cached model
+
+6. **Local Processing**: Embeddings are generated locally - no API calls, no rate limits, no costs!
 
 ### Error Handling
 
@@ -132,7 +145,8 @@ bun run vectorize:remote recipes-parsed.json 200 20
 Required:
 - `NEXT_PUBLIC_SUPABASE_URL` - Supabase project URL
 - `SUPABASE_SERVICE_ROLE_KEY` - Supabase service role key
-- `GEMINI_API_KEY` - Google Gemini API key
+
+Note: No API key needed! Embeddings are generated locally using @xenova/transformers.
 
 Optional:
 - `USE_LOCAL_SUPABASE=true` - Force local Supabase mode
