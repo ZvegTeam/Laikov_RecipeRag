@@ -29,7 +29,8 @@ rag-ai/
 │       └── RecipeDetails.tsx # Detailed recipe view with instructions
 ├── lib/                   # Utility functions
 │   ├── supabase.ts        # Supabase client
-│   ├── gemini.ts          # Gemini AI client
+│   ├── embeddings.ts      # Local embedding generation (@xenova/transformers)
+│   ├── gemini.ts          # Gemini AI client (for future recipe details extraction)
 │   └── utils.ts           # Helper functions
 ├── scripts/               # Data processing scripts
 │   ├── parse-json.ts      # Parse MongoDB JSON format
@@ -48,6 +49,7 @@ rag-ai/
 #### 1.1 Initialize Next.js Project
 - [x] Create Next.js 14+ project with TypeScript
 - [x] Setup Biome for linting and formatting
+- [x] Setup Git pre-commit hooks for automatic linting and formatting
 - [x] Initialize Git repository
 - [x] Install dependencies using Bun:
   - [x] `@mantine/core`, `@mantine/hooks`, `@mantine/form`
@@ -97,7 +99,9 @@ rag-ai/
 - [x] Create data migration script (`scripts/vectorize-data.ts`):
   - [x] Supports both local and remote Supabase (configurable via USE_LOCAL_SUPABASE or USE_REMOTE_SUPABASE env vars)
   - [x] Read parsed JSON file
-  - [x] Generate embeddings for each recipe
+  - [x] Fetch existing recipe IDs to skip already processed recipes
+  - [x] Process in batches: generate embeddings and insert immediately (resume capability)
+  - [x] Generate embeddings for each recipe using local transformers
   - [x] Insert into Supabase with embeddings
   - [x] Progress tracking and error handling
   - [x] Configurable batch sizes for embeddings and database inserts
