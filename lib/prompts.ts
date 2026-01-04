@@ -3,6 +3,9 @@
  * Centralized prompt definitions for scalability and maintainability
  */
 
+import { z } from "zod";
+import { zodToJsonSchema } from "zod-to-json-schema";
+
 export enum PromptType {
   RECIPE_URL_EXTRACTION = "recipe_url_extraction",
   RECIPE_WEB_SEARCH = "recipe_web_search",
@@ -16,6 +19,69 @@ interface RecipeContext {
   ingredients: string;
   url?: string;
 }
+
+/**
+ * Zod schema for validating recipe details response
+ * This is the single source of truth for the response structure
+ */
+export const recipeDetailsZodSchema = z.object({
+  cooking_instructions: z.string().describe("Complete step-by-step cooking instructions"),
+  additional_info: z
+    .object({
+      tips: z.array(z.string()).optional().describe("Cooking tips and techniques"),
+      variations: z.array(z.string()).optional().describe("Recipe variations or substitutions"),
+      serving_suggestions: z.string().optional().describe("Serving and presentation suggestions"),
+      difficulty: z.enum(["Easy", "Medium", "Hard"]).optional().describe("Recipe difficulty level"),
+      nutrition_tips: z.string().optional().describe("Nutrition tips and information"),
+    })
+    .optional(),
+});
+
+export type RecipeDetailsResponse = z.infer<typeof recipeDetailsZodSchema>;
+
+/**
+ * JSON Schema for recipe details response
+ * Generated from Zod schema to ensure consistency
+ * Used to ensure structured JSON output from Gemini AI
+ * The schema is extracted from the zodToJsonSchema result
+ */
+/**
+ * Generate JSON Schema from Zod schema
+ * This ensures the schema is always in sync with the Zod validation
+ */
+const rawSchema = zodToJsonSchema(recipeDetailsZodSchema, {
+  name: "RecipeDetails",
+});
+
+// Extract the actual schema (zodToJsonSchema may wrap it in definitions)
+// For Gemini API, we need the plain schema object
+function extractSchema(schema: unknown): {
+  type: string;
+  properties: Record<string, unknown>;
+  required?: string[];
+} {
+  if (
+    typeof schema === "object" &&
+    schema !== null &&
+    "definitions" in schema &&
+    typeof schema.definitions === "object" &&
+    schema.definitions !== null &&
+    "RecipeDetails" in schema.definitions
+  ) {
+    return schema.definitions.RecipeDetails as {
+      type: string;
+      properties: Record<string, unknown>;
+      required?: string[];
+    };
+  }
+  return schema as {
+    type: string;
+    properties: Record<string, unknown>;
+    required?: string[];
+  };
+}
+
+export const recipeDetailsSchema = extractSchema(rawSchema);
 
 /**
  * Generate prompt for recipe URL extraction
@@ -40,17 +106,7 @@ Please provide:
 4. Serving suggestions
 5. Any additional helpful information (difficulty level, nutrition tips, storage instructions, etc.)
 
-Format the response as JSON with the following structure:
-{
-  "cooking_instructions": "Step-by-step instructions...",
-  "additional_info": {
-    "tips": ["tip1", "tip2"],
-    "variations": ["variation1", "variation2"],
-    "serving_suggestions": "suggestions text",
-    "difficulty": "Easy/Medium/Hard",
-    "nutrition_tips": "tips text"
-  }
-}`;
+You MUST return a valid JSON object that matches the provided JSON schema exactly. The response must be valid JSON only, without any markdown formatting or additional text.`;
 }
 
 /**
@@ -71,17 +127,7 @@ Find and provide:
 4. Serving and presentation suggestions
 5. Any additional relevant information
 
-Format the response as structured JSON with cooking_instructions and additional_info fields:
-{
-  "cooking_instructions": "Step-by-step instructions...",
-  "additional_info": {
-    "tips": ["tip1", "tip2"],
-    "variations": ["variation1", "variation2"],
-    "serving_suggestions": "suggestions text",
-    "difficulty": "Easy/Medium/Hard",
-    "nutrition_tips": "tips text"
-  }
-}`;
+You MUST return a valid JSON object that matches the provided JSON schema exactly. The response must be valid JSON only, without any markdown formatting or additional text.`;
 }
 
 /**

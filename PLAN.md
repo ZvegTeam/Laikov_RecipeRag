@@ -142,39 +142,27 @@ rag-ai/
   - [x] Support multiple prompt types (URL extraction, web search, etc.)
   - [x] Context validation for each prompt type
   - [x] Easy to extend with new prompt types
-- [ ] Create `/api/recipe-details` route:
-  - Accept POST request with `recipeId` or `recipeUrl`
-  - Check if cooking instructions already exist in database
-  - If not, use Gemini AI to fetch details:
+- [x] Create `/api/recipe-details` route (`app/api/recipe-details/route.ts`):
+  - [x] Accept POST request with `recipeId` or `recipeUrl` (Zod validation)
+  - [x] Check if cooking instructions already exist in database (cache check)
+  - [x] If not, use Gemini AI to fetch details with JSON schema validation:
     - **Primary method**: Use Gemini with URL access capability
       - Use `getRecipeUrlExtractionPrompt()` from prompt service
+      - Pass JSON schema to Gemini API for structured output
       - Use Gemini's web browsing capability if available
     - **Fallback method**: If URL is not accessible or fails:
       - Use Gemini's web search capability
       - Use `getRecipeWebSearchPrompt()` from prompt service
-  - Parse and structure the response:
+      - Pass same JSON schema for consistent output
+  - [x] Parse and structure the response:
     - Extract cooking instructions (step-by-step)
     - Extract additional info (tips, variations, serving suggestions, etc.)
-    - Validate JSON structure
-  - Store in database for future use (cache with `instructions_fetched_at` timestamp)
-  - Return structured data:
-    ```typescript
-    {
-      cooking_instructions: string,
-      additional_info: {
-        tips?: string[],
-        variations?: string[],
-        serving_suggestions?: string,
-        difficulty?: string,
-        nutrition_tips?: string
-      },
-      cached: boolean, // Whether data was from cache
-      fetched_at?: string // When data was fetched
-    }
-    ```
-  - Handle errors gracefully (URL not accessible, no web results, parsing errors, etc.)
-  - Include rate limiting to prevent abuse
-  - Log prompt usage for monitoring and optimization
+    - Validate JSON structure with Zod schema (double validation)
+  - [x] Store in database for future use (cache with `instructions_fetched_at` timestamp)
+  - [x] Return structured data with `cached` flag and `fetched_at` timestamp
+  - [x] Handle errors gracefully (URL not accessible, no web results, parsing errors, etc.)
+  - [ ] Include rate limiting to prevent abuse (TODO: implement rate limiting)
+  - [x] Log errors for monitoring and optimization
 
 #### 3.4 Vectorization API (Optional - Admin)
 - [ ] Create `/api/vectorize` route for re-vectorization:

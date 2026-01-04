@@ -118,3 +118,43 @@ export function prepareTextForEmbedding(recipe: {
 
   return parts.join(". ");
 }
+
+/**
+ * Generate content using Gemini AI with structured JSON output
+ * Uses JSON schema to ensure consistent response format
+ * @param prompt - Prompt text
+ * @param schema - JSON schema for structured output
+ * @param model - Model name (default: gemini-1.5-pro)
+ * @returns Parsed JSON response
+ */
+export async function generateStructuredContent<T>(
+  prompt: string,
+  schema: object,
+  model = "gemini-1.5-pro"
+): Promise<T> {
+  const client = createGeminiClient();
+  const genModel = client.getGenerativeModel({
+    model,
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: schema,
+    },
+  });
+
+  try {
+    const result = await genModel.generateContent(prompt);
+    const response = result.response;
+    const text = response.text();
+
+    if (!text) {
+      throw new Error("No response text from Gemini");
+    }
+
+    // Parse JSON response
+    const parsed = JSON.parse(text) as T;
+    return parsed;
+  } catch (error) {
+    console.error("Error generating structured content:", error);
+    throw error;
+  }
+}
