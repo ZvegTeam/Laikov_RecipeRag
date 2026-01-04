@@ -118,9 +118,11 @@ rag-ai/
 ### Phase 3: Backend API Development
 
 #### 3.1 Supabase Client Setup
-- [ ] Create Supabase client utilities:
-  - Client-side client (for browser)
-  - Server-side client (for API routes with service role key)
+- [x] Create Supabase client utilities (`lib/supabase.ts`):
+  - [x] Client-side client (for browser) - `createSupabaseClient()`
+  - [x] Server-side client (for API routes with service role key) - `createSupabaseServerClient()`
+  - [x] Environment variable validation and error handling
+  - [x] Proper server-side configuration (auth disabled for server use)
 
 #### 3.2 Search API Endpoint
 - [ ] Create `/api/search` route:
