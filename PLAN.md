@@ -173,9 +173,14 @@ rag-ai/
 ### Phase 4: Frontend Development
 
 #### 4.1 UI Setup
-- [ ] Configure Mantine provider in root layout
-- [ ] Setup theme customization
-- [ ] Create responsive layout structure
+- [x] Configure Mantine provider in root layout
+- [x] Setup theme customization
+- [x] Create responsive layout structure
+- [ ] **Mobile Responsiveness:**
+  - Configure Mantine breakpoints for mobile-first design
+  - Setup viewport meta tags for proper mobile rendering
+  - Test on various screen sizes (320px, 375px, 414px, 768px, 1024px, 1280px+)
+  - Ensure touch-friendly interactions (minimum 44x44px touch targets)
 
 #### 4.2 Search Interface
 - [ ] Build `SearchForm` component:
@@ -184,6 +189,13 @@ rag-ai/
   - Loading states
   - Error handling
   - Clear/reset functionality
+- [ ] **Mobile Responsiveness:**
+  - Full-width form on mobile devices
+  - Stack input fields vertically on small screens
+  - Large, touch-friendly buttons (minimum 44px height)
+  - Optimize tag input for mobile (easy to add/remove tags)
+  - Consider bottom sheet or modal for ingredient selection on mobile
+  - Ensure keyboard doesn't cover input fields
 
 #### 4.3 Recipe Display
 - [ ] Create `RecipeCard` component:
@@ -194,6 +206,14 @@ rag-ai/
   - Link to original recipe URL
   - "View Details" button to fetch and show full recipe
   - Responsive design
+- [ ] **Mobile Responsiveness:**
+  - Single column layout on mobile (< 768px)
+  - Card takes full width on mobile with proper padding
+  - Optimize image sizes for mobile (lazy loading, responsive images)
+  - Truncate long descriptions with "Read more" on mobile
+  - Touch-friendly buttons and links
+  - Ensure text is readable without zooming (minimum 16px font size)
+  - Collapsible sections for ingredients/details on mobile
 
 #### 4.3.1 Recipe Details Component
 - [ ] Create `RecipeDetails` component:
@@ -214,6 +234,16 @@ rag-ai/
   - Cache indicator (show if using cached data)
   - Link to original recipe URL
   - Share functionality
+- [ ] **Mobile Responsiveness:**
+  - Full-screen modal or dedicated page on mobile
+  - Sticky header with close/back button on mobile
+  - Scrollable content area with proper padding
+  - Large, readable typography for instructions
+  - Collapsible sections for tips/variations to save space
+  - Bottom sheet or floating action button for share on mobile
+  - Optimize images for mobile bandwidth
+  - Ensure instructions are easy to follow while cooking (large text, clear steps)
+  - Consider swipe gestures for navigation between steps
 
 #### 4.4 Recipe List
 - [ ] Create `RecipeList` component:
@@ -221,6 +251,14 @@ rag-ai/
   - Empty state when no results
   - Loading skeleton states
   - Pagination (if needed)
+- [ ] **Mobile Responsiveness:**
+  - Single column grid on mobile (< 768px)
+  - 2-column grid on tablet (768px - 1024px)
+  - 3+ column grid on desktop (> 1024px)
+  - Infinite scroll or "Load More" button instead of pagination on mobile
+  - Optimize skeleton loaders for mobile (fewer cards visible)
+  - Pull-to-refresh functionality on mobile
+  - Smooth scrolling with proper spacing between cards
 
 #### 4.5 Main Page
 - [ ] Combine components in main page:
@@ -228,6 +266,15 @@ rag-ai/
   - Results below
   - Smooth transitions and animations
   - Responsive design for mobile/tablet/desktop
+- [ ] **Mobile Responsiveness:**
+  - Sticky search bar on mobile (fixed at top when scrolling)
+  - Proper spacing and padding for mobile (16px minimum)
+  - Optimize animations for mobile performance (use CSS transforms)
+  - Test on real devices (iOS Safari, Chrome Android)
+  - Handle orientation changes (portrait/landscape)
+  - Ensure no horizontal scrolling on any screen size
+  - Bottom navigation or floating action button for key actions
+  - Consider progressive web app (PWA) features for mobile
 
 ### Phase 5: Optimization & Polish
 
