@@ -1,11 +1,14 @@
 import { Container, Stack, Text, Title } from "@mantine/core";
+import classes from "./page.module.css";
 
 export default function Home() {
   return (
-    <Container size="xl" py="xl">
+    <Container size="xl" py="xl" px={{ base: "sm", sm: "md", lg: "xl" }}>
       <Stack gap="lg">
-        <Title order={1}>Recipe Search Application</Title>
-        <Text size="lg" c="dimmed">
+        <Title order={1} className={classes.title}>
+          Recipe Search Application
+        </Title>
+        <Text size="lg" c="dimmed" className={classes.text}>
           Find recipes based on ingredients using AI-powered search
         </Text>
       </Stack>

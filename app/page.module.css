@@ -1,0 +1,23 @@
+/* Responsive styles for home page */
+.title {
+  font-size: 2rem;
+  line-height: 1.3;
+  text-align: center;
+}
+
+.text {
+  text-align: center;
+}
+
+/* Tablet and larger */
+@media (min-width: 768px) {
+  .title {
+    font-size: 2.5rem;
+    line-height: 1.2;
+    text-align: left;
+  }
+
+  .text {
+    text-align: left;
+  }
+}

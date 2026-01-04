@@ -14,7 +14,16 @@ const theme = createTheme({
   fontFamily: inter.style.fontFamily,
   /** Default font size */
   defaultRadius: "md",
-  /** Headings configuration */
+  /** Breakpoints for mobile-first responsive design */
+  breakpoints: {
+    xs: "320px", // Extra small devices (small phones)
+    sm: "375px", // Small devices (phones)
+    md: "414px", // Medium devices (large phones)
+    lg: "768px", // Large devices (tablets)
+    xl: "1024px", // Extra large devices (desktops)
+    "2xl": "1280px", // 2X Extra large devices (large desktops)
+  },
+  /** Headings configuration with responsive sizes */
   headings: {
     fontFamily: inter.style.fontFamily,
     sizes: {
@@ -51,6 +60,12 @@ const theme = createTheme({
 export const metadata: Metadata = {
   title: "Recipe Search - RAG AI",
   description: "Find recipes based on ingredients using AI-powered search",
+  viewport: {
+    width: "device-width",
+    initialScale: 1,
+    maximumScale: 5,
+    userScalable: true,
+  },
 };
 
 export default function RootLayout({
