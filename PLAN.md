@@ -125,19 +125,15 @@ rag-ai/
   - [x] Proper server-side configuration (auth disabled for server use)
 
 #### 3.2 Search API Endpoint
-- [ ] Create `/api/search` route:
-  - Accept POST request with `ingredients` array
-  - Generate embedding for user's ingredient list using Gemini
-  - Query Supabase using cosine similarity:
-    ```sql
-    SELECT *, 1 - (embedding <=> $1::vector) as similarity
-    FROM recipes
-    WHERE embedding IS NOT NULL
-    ORDER BY embedding <=> $1::vector
-    LIMIT 20;
-    ```
-  - Return recipes with similarity scores
-  - Handle errors gracefully
+- [x] Create `/api/search` route (`app/api/search/route.ts`):
+  - [x] Accept POST request with `ingredients` array (validated with Zod)
+  - [x] Generate embedding for user's ingredient list using local transformers (@xenova/transformers)
+  - [x] Query Supabase using cosine similarity via RPC function `search_recipes_by_embedding`
+  - [x] Return recipes with similarity scores
+  - [x] Handle errors gracefully (validation errors, database errors, etc.)
+  - [x] Create database function for efficient vector similarity search (`003_create_search_function.sql`)
+  - [x] Support configurable result limit (default: 20, max: 50)
+  - [x] Support configurable similarity threshold (default: 0.3)
 
 #### 3.3 Recipe Details API Endpoint
 - [ ] Create `/api/recipe-details` route:
