@@ -161,7 +161,7 @@ rag-ai/
   - [x] Store in database for future use (cache with `instructions_fetched_at` timestamp)
   - [x] Return structured data with `cached` flag and `fetched_at` timestamp
   - [x] Handle errors gracefully (URL not accessible, no web results, parsing errors, etc.)
-  - [ ] Include rate limiting to prevent abuse (TODO: implement rate limiting)
+  - [x] Include rate limiting to prevent abuse (10 requests per minute per IP)
   - [x] Log errors for monitoring and optimization
 
 #### 3.4 Vectorization API (Optional - Admin)

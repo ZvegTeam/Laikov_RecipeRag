@@ -7,6 +7,7 @@ import {
   validatePromptContext,
 } from "@/lib/prompts";
 import type { RecipeDetailsResponse } from "@/lib/prompts";
+import { rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import type { Recipe } from "@/types/recipe";
 import { type NextRequest, NextResponse } from "next/server";
@@ -26,9 +27,32 @@ const recipeDetailsRequestSchema = z
  * POST /api/recipe-details
  * Fetch detailed recipe information including cooking instructions
  * Uses Gemini AI with JSON schema validation for structured output
+ * Rate limited to 10 requests per minute per IP address
  */
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting: 10 requests per minute per IP
+    const { result: rateLimitResult, headers: rateLimitHeaders } = rateLimit(request, {
+      maxRequests: 10,
+      windowMs: 60 * 1000, // 1 minute
+    });
+
+    if (!rateLimitResult.allowed) {
+      return NextResponse.json(
+        {
+          error: "Rate limit exceeded",
+          message: `Too many requests. Please try again after ${new Date(
+            rateLimitResult.resetAt
+          ).toISOString()}`,
+          retryAfter: Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000),
+        },
+        {
+          status: 429,
+          headers: rateLimitHeaders,
+        }
+      );
+    }
+
     // Parse and validate request body
     const body = await request.json();
     const { recipeId, recipeUrl } = recipeDetailsRequestSchema.parse(body);
@@ -80,12 +104,17 @@ export async function POST(request: NextRequest) {
     // Check if cooking instructions already exist in database
     if (recipe.cooking_instructions && recipe.instructions_fetched_at) {
       // Return cached data
-      return NextResponse.json({
-        cooking_instructions: recipe.cooking_instructions,
-        additional_info: recipe.additional_info || {},
-        cached: true,
-        fetched_at: recipe.instructions_fetched_at,
-      });
+      return NextResponse.json(
+        {
+          cooking_instructions: recipe.cooking_instructions,
+          additional_info: recipe.additional_info || {},
+          cached: true,
+          fetched_at: recipe.instructions_fetched_at,
+        },
+        {
+          headers: rateLimitHeaders,
+        }
+      );
     }
 
     // Generate cooking instructions using Gemini AI
@@ -148,12 +177,17 @@ export async function POST(request: NextRequest) {
       }
 
       // Return structured data
-      return NextResponse.json({
-        cooking_instructions: validatedDetails.cooking_instructions,
-        additional_info: validatedDetails.additional_info || {},
-        cached: false,
-        fetched_at: new Date().toISOString(),
-      });
+      return NextResponse.json(
+        {
+          cooking_instructions: validatedDetails.cooking_instructions,
+          additional_info: validatedDetails.additional_info || {},
+          cached: false,
+          fetched_at: new Date().toISOString(),
+        },
+        {
+          headers: rateLimitHeaders,
+        }
+      );
     } catch (geminiError) {
       console.error("Error fetching recipe details from Gemini:", geminiError);
       return NextResponse.json(

@@ -85,7 +85,20 @@
     "anonKey",
     "supabaseUrl",
     "supabaseAnonKey",
-    "supabaseServiceRoleKey"
+    "supabaseServiceRoleKey",
+    "rateLimit",
+    "rateLimitResult",
+    "rateLimitHeaders",
+    "maxRequests",
+    "windowMs",
+    "retryAfter",
+    "resetAt",
+    "RateLimitEntry",
+    "RateLimitResult",
+    "RateLimitOptions",
+    "cleanupExpiredEntries",
+    "startCleanupTimer",
+    "getClientIP"
   ],
   "ignorePaths": [
     "node_modules",
