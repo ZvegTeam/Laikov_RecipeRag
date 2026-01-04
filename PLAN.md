@@ -107,13 +107,13 @@ rag-ai/
   - [x] Configurable batch sizes for embeddings and database inserts
 
 #### 2.3 Data Migration Script
-- [ ] Create Node.js script (`scripts/vectorize-data.ts`):
-  - Read JSON file
-  - Parse each recipe
-  - Generate embedding for each recipe
-  - Insert into Supabase with embedding
-  - Include progress tracking and error handling
-  - Resume capability for failed batches
+- [x] Create Node.js script (`scripts/vectorize-data.ts`):
+  - [x] Read JSON file
+  - [x] Parse each recipe
+  - [x] Generate embedding for each recipe
+  - [x] Insert into Supabase with embedding
+  - [x] Include progress tracking and error handling
+  - [x] Resume capability for failed batches (via fetching existing recipe IDs)
 
 ### Phase 3: Backend API Development
 
