@@ -30,7 +30,8 @@ rag-ai/
 ├── lib/                   # Utility functions
 │   ├── supabase.ts        # Supabase client
 │   ├── embeddings.ts      # Local embedding generation (@xenova/transformers)
-│   ├── gemini.ts          # Gemini AI client (for future recipe details extraction)
+│   ├── gemini.ts          # Gemini AI client (for recipe details extraction)
+│   ├── prompts.ts         # Prompt service for AI content generation
 │   └── utils.ts           # Helper functions
 ├── scripts/               # Data processing scripts
 │   ├── parse-json.ts      # Parse MongoDB JSON format
@@ -136,20 +137,26 @@ rag-ai/
   - [x] Support configurable similarity threshold (default: 0.3)
 
 #### 3.3 Recipe Details API Endpoint
+- [ ] Create prompt service (`lib/prompts.ts`):
+  - [x] Centralized prompt definitions for scalability
+  - [x] Support multiple prompt types (URL extraction, web search, etc.)
+  - [x] Context validation for each prompt type
+  - [x] Easy to extend with new prompt types
 - [ ] Create `/api/recipe-details` route:
   - Accept POST request with `recipeId` or `recipeUrl`
   - Check if cooking instructions already exist in database
   - If not, use Gemini AI to fetch details:
     - **Primary method**: Use Gemini with URL access capability
-      - Prompt: "Extract the complete cooking instructions, step-by-step process, and any additional information (tips, variations, serving suggestions) from this recipe URL: {url}. Return the information in a structured format."
+      - Use `getRecipeUrlExtractionPrompt()` from prompt service
       - Use Gemini's web browsing capability if available
     - **Fallback method**: If URL is not accessible or fails:
       - Use Gemini's web search capability
-      - Prompt: "Search the web for cooking instructions and detailed recipe information for: {recipe_name}. Include step-by-step cooking process, tips, and any additional relevant information."
+      - Use `getRecipeWebSearchPrompt()` from prompt service
   - Parse and structure the response:
     - Extract cooking instructions (step-by-step)
     - Extract additional info (tips, variations, serving suggestions, etc.)
-  - Store in database for future use (cache)
+    - Validate JSON structure
+  - Store in database for future use (cache with `instructions_fetched_at` timestamp)
   - Return structured data:
     ```typescript
     {
@@ -160,11 +167,14 @@ rag-ai/
         serving_suggestions?: string,
         difficulty?: string,
         nutrition_tips?: string
-      }
+      },
+      cached: boolean, // Whether data was from cache
+      fetched_at?: string // When data was fetched
     }
     ```
-  - Handle errors gracefully (URL not accessible, no web results, etc.)
+  - Handle errors gracefully (URL not accessible, no web results, parsing errors, etc.)
   - Include rate limiting to prevent abuse
+  - Log prompt usage for monitoring and optimization
 
 #### 3.4 Vectorization API (Optional - Admin)
 - [ ] Create `/api/vectorize` route for re-vectorization:
