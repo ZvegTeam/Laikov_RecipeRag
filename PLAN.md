@@ -197,7 +197,7 @@ rag-ai/
   - Ensure keyboard doesn't cover input (scroll margin / scroll-into-view)
 
 #### 4.3 Recipe Display
-- [ ] Create `RecipeCard` component:
+- [x] Create `RecipeCard` component:
   - Display recipe name, image, description
   - Show ingredients list
   - Display cook time, prep time, yield
@@ -205,7 +205,7 @@ rag-ai/
   - Link to original recipe URL
   - "View Details" button to fetch and show full recipe
   - Responsive design
-- [ ] **Mobile Responsiveness:**
+- [x] **Mobile Responsiveness:**
   - Single column layout on mobile (< 768px)
   - Card takes full width on mobile with proper padding
   - Optimize image sizes for mobile (lazy loading, responsive images)

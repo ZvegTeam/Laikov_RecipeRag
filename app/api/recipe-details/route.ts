@@ -10,6 +10,7 @@ import type { RecipeDetailsResponse } from "@/lib/prompts";
 import { rateLimit } from "@/lib/rate-limit";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import type { Recipe } from "@/types/recipe";
+import type { ResponseSchema } from "@google/generative-ai";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -133,7 +134,7 @@ export async function POST(request: NextRequest) {
           const prompt = getPrompt(PromptType.RECIPE_URL_EXTRACTION, context);
           recipeDetails = await generateStructuredContent<RecipeDetailsResponse>(
             prompt,
-            recipeDetailsSchema,
+            recipeDetailsSchema as ResponseSchema,
             "gemini-1.5-pro"
           );
         } catch (urlError) {
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
           const prompt = getPrompt(PromptType.RECIPE_WEB_SEARCH, context);
           recipeDetails = await generateStructuredContent<RecipeDetailsResponse>(
             prompt,
-            recipeDetailsSchema,
+            recipeDetailsSchema as ResponseSchema,
             "gemini-1.5-pro"
           );
         }
@@ -153,7 +154,7 @@ export async function POST(request: NextRequest) {
         const prompt = getPrompt(PromptType.RECIPE_WEB_SEARCH, context);
         recipeDetails = await generateStructuredContent<RecipeDetailsResponse>(
           prompt,
-          recipeDetailsSchema,
+          recipeDetailsSchema as ResponseSchema,
           "gemini-1.5-pro"
         );
       }
