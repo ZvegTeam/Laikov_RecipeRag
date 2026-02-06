@@ -183,19 +183,18 @@ rag-ai/
   - [x] Ensure touch-friendly interactions (minimum 44x44px touch targets)
 
 #### 4.2 Search Interface
-- [ ] Build `SearchForm` component:
-  - Multi-select or tag input for ingredients
+- [x] Build `SearchForm` component:
+  - Multi-line text area for ingredients (one ingredient per line)
   - Search button
   - Loading states
   - Error handling
   - Clear/reset functionality
-- [ ] **Mobile Responsiveness:**
+- [x] **Mobile Responsiveness:**
   - Full-width form on mobile devices
   - Stack input fields vertically on small screens
   - Large, touch-friendly buttons (minimum 44px height)
-  - Optimize tag input for mobile (easy to add/remove tags)
-  - Consider bottom sheet or modal for ingredient selection on mobile
-  - Ensure keyboard doesn't cover input fields
+  - Optimize textarea for mobile (comfortable min height, easy to type)
+  - Ensure keyboard doesn't cover input (scroll margin / scroll-into-view)
 
 #### 4.3 Recipe Display
 - [ ] Create `RecipeCard` component:

@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
+import { GoogleGenerativeAI, type ResponseSchema } from "@google/generative-ai";
 
 /**
  * Initialize Gemini AI client
@@ -129,7 +129,7 @@ export function prepareTextForEmbedding(recipe: {
  */
 export async function generateStructuredContent<T>(
   prompt: string,
-  schema: object,
+  schema: ResponseSchema,
   model = "gemini-1.5-pro"
 ): Promise<T> {
   const client = createGeminiClient();

@@ -1,4 +1,5 @@
 import { Container, Stack, Text, Title } from "@mantine/core";
+import { SearchForm } from "./components/SearchForm";
 import classes from "./page.module.css";
 
 export default function Home() {
@@ -11,6 +12,7 @@ export default function Home() {
         <Text size="lg" c="dimmed" className={classes.text}>
           Find recipes based on ingredients using AI-powered search
         </Text>
+        <SearchForm />
       </Stack>
     </Container>
   );
