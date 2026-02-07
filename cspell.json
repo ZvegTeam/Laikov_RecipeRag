@@ -75,6 +75,7 @@
     "getSupabaseConfig",
     "getExistingRecipeIds",
     "insertRecipeBatch",
+    "GoogleGenAI",
     "GoogleGenerativeAI",
     "GEMINI",
     "Gemini",
