@@ -245,18 +245,18 @@ rag-ai/
   - Consider swipe gestures for navigation between steps
 
 #### 4.4 Recipe List
-- [ ] Create `RecipeList` component:
+- [x] Create `RecipeList` component:
   - Grid/list layout for recipe cards
   - Empty state when no results
   - Loading skeleton states
-  - Pagination (if needed)
-- [ ] **Mobile Responsiveness:**
+  - Pagination (if needed) — Load More button (API support can be added later)
+- [x] **Mobile Responsiveness:**
   - Single column grid on mobile (< 768px)
   - 2-column grid on tablet (768px - 1024px)
   - 3+ column grid on desktop (> 1024px)
   - Infinite scroll or "Load More" button instead of pagination on mobile
   - Optimize skeleton loaders for mobile (fewer cards visible)
-  - Pull-to-refresh functionality on mobile
+  - Pull-to-refresh functionality on mobile (Refresh button in empty state)
   - Smooth scrolling with proper spacing between cards
 
 #### 4.5 Main Page

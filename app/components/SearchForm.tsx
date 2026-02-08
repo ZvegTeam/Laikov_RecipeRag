@@ -16,6 +16,8 @@ function parseIngredients(value: string): string[] {
 export interface SearchFormProps {
   /** Called with search results on success. */
   onResults?: (recipes: Recipe[]) => void;
+  /** Called when search request starts or finishes (for loading UI). */
+  onLoadingChange?: (loading: boolean) => void;
   /** Placeholder for the ingredients textarea. */
   placeholder?: string;
   /** Minimum height of the textarea. */
@@ -24,6 +26,7 @@ export interface SearchFormProps {
 
 export function SearchForm({
   onResults,
+  onLoadingChange,
   placeholder = "Enter ingredients, one per line (e.g. chicken, garlic, olive oil)",
   minRows = 4,
 }: SearchFormProps) {
@@ -49,6 +52,7 @@ export function SearchForm({
 
       setSubmitError(null);
       setLoading(true);
+      onLoadingChange?.(true);
 
       try {
         const res = await fetch("/api/search", {
@@ -70,9 +74,10 @@ export function SearchForm({
         setSubmitError(err instanceof Error ? err.message : "Something went wrong");
       } finally {
         setLoading(false);
+        onLoadingChange?.(false);
       }
     },
-    [onResults]
+    [onResults, onLoadingChange]
   );
 
   const handleClear = useCallback(() => {
