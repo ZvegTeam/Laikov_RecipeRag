@@ -257,7 +257,7 @@ export function RecipeDetails({ recipe, opened, onClose }: RecipeDetailsProps) {
               )}
               {needsFetch && !loading && (
                 <Button variant="light" size="md" onClick={fetchDetails} style={{ minHeight: 44 }}>
-                  Fetch instructions
+                  Get instructions
                 </Button>
               )}
               {instructions && !loading && (

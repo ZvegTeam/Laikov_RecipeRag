@@ -10,3 +10,20 @@ body {
   margin: 0;
   padding: 0;
 }
+
+/* Sticky search bar on mobile when scrolling */
+@media (max-width: 767px) {
+  .searchSectionSticky {
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    background: var(--mantine-color-body);
+    padding-bottom: 16px;
+    margin-bottom: -8px;
+  }
+}
+
+/* Smooth transition for results area */
+.resultsTransition {
+  transition: opacity 0.2s ease-out;
+}

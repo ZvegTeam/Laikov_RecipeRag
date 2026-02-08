@@ -2,6 +2,7 @@
 
 import type { Recipe } from "@/types/recipe";
 import { Box, Button, Stack } from "@mantine/core";
+import { ArrowUpToLine } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { RecipeDetails } from "./RecipeDetails";
 import { RecipeList } from "./RecipeList";
@@ -42,15 +43,17 @@ export function SearchWithResults() {
 
   return (
     <Stack gap="lg">
-      <Box ref={searchSectionRef}>
+      <Box ref={searchSectionRef} className="searchSectionSticky">
         <SearchForm onResults={setRecipes} onLoadingChange={setLoading} />
       </Box>
-      <RecipeList
-        recipes={recipes}
-        loading={loading}
-        onViewDetails={handleViewDetails}
-        emptyMessage="Enter ingredients above and click Search to find recipes."
-      />
+      <Box className="resultsTransition">
+        <RecipeList
+          recipes={recipes}
+          loading={loading}
+          onViewDetails={handleViewDetails}
+          emptyMessage="Enter ingredients above and click Search to find recipes."
+        />
+      </Box>
       <RecipeDetails recipe={selectedRecipe} opened={detailsOpened} onClose={handleCloseDetails} />
       {showGoToTop && (
         <Box
@@ -61,8 +64,13 @@ export function SearchWithResults() {
             zIndex: 100,
           }}
         >
-          <Button size="md" onClick={scrollToTop} style={{ minHeight: 44 }} aria-label="Go to top">
-            Go to top
+          <Button
+            size="compact-md"
+            onClick={scrollToTop}
+            style={{ minHeight: 44 }}
+            aria-label="Go to top"
+          >
+            <ArrowUpToLine size={20} />
           </Button>
         </Box>
       )}

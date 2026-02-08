@@ -2,7 +2,7 @@
 
 import type { Recipe } from "@/types/recipe";
 import {
-  Anchor,
+  ActionIcon,
   Badge,
   Box,
   Button,
@@ -14,8 +14,10 @@ import {
   Stack,
   Text,
   Title,
+  Tooltip,
 } from "@mantine/core";
 import { useDisclosure } from "@mantine/hooks";
+import { ExternalLink } from "lucide-react";
 
 /** Split recipe ingredients string into list items (by newline or comma). */
 function formatIngredients(ingredients: string): string[] {
@@ -45,9 +47,13 @@ export function RecipeCard({ recipe, onViewDetails }: RecipeCardProps) {
       withBorder
       w="100%"
       maw="100%"
-      style={{ minWidth: 0 }}
+      style={{
+        minWidth: 0,
+        display: "flex",
+        flexDirection: "column",
+      }}
     >
-      <Card.Section>
+      <Card.Section style={{ flexShrink: 0 }}>
         <Image
           src={recipe.image}
           alt={recipe.name}
@@ -58,7 +64,11 @@ export function RecipeCard({ recipe, onViewDetails }: RecipeCardProps) {
         />
       </Card.Section>
 
-      <Stack gap="sm" mt="sm">
+      <Stack
+        gap="sm"
+        mt="sm"
+        style={{ flex: 1, display: "flex", flexDirection: "column", minHeight: 0 }}
+      >
         <Group justify="space-between" wrap="nowrap" gap="xs">
           <Title
             order={3}
@@ -141,17 +151,22 @@ export function RecipeCard({ recipe, onViewDetails }: RecipeCardProps) {
           </Box>
         )}
 
-        <Group gap="sm" mt="xs">
+        <Group gap="sm" mt="auto" style={{ flexShrink: 0 }}>
           {recipe.url && (
-            <Anchor
-              href={recipe.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              size="sm"
-              style={{ fontSize: "1rem", minHeight: 44, lineHeight: "44px" }}
-            >
-              Original recipe
-            </Anchor>
+            <Tooltip label="Open original recipe">
+              <ActionIcon
+                component="a"
+                href={recipe.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                variant="light"
+                size="lg"
+                aria-label="Open original recipe"
+                style={{ minWidth: 44, minHeight: 44 }}
+              >
+                <ExternalLink size={20} />
+              </ActionIcon>
+            </Tooltip>
           )}
           <Button
             variant="light"

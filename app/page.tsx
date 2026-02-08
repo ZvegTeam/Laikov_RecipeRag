@@ -4,7 +4,7 @@ import classes from "./page.module.css";
 
 export default function Home() {
   return (
-    <Container size="xl" py="xl" px={{ base: "sm", sm: "md", lg: "xl" }}>
+    <Container size="xl" py="xl" px={{ base: "md", sm: "md", lg: "xl" }}>
       <Stack gap="lg">
         <Title order={1} className={classes.title}>
           Recipe Search Application
