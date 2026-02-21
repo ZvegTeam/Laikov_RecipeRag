@@ -1,19 +1,21 @@
 #!/usr/bin/env bun
 /**
- * Vectorize and upload recipe data to Supabase
- * Supports both local and remote Supabase instances
+ * Vectorize and upload recipe data to the database (Drizzle ORM)
+ * Supports both local and remote Postgres (e.g. Supabase)
  * Processes in batches: generates embeddings and inserts immediately
  * Skips already processed recipes to allow resuming
  */
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import { sql } from "drizzle-orm";
+import { db } from "../lib/db";
+import { recipes } from "../lib/db/schema";
 import {
   generateEmbeddingsBatch,
   getEmbeddingDimension,
   prepareTextForEmbedding,
 } from "../lib/embeddings";
-import { createSupabaseServerClient } from "../lib/supabase";
 import type { ParsedRecipe } from "../types/recipe";
 
 interface RecipeWithEmbedding extends ParsedRecipe {
@@ -21,69 +23,19 @@ interface RecipeWithEmbedding extends ParsedRecipe {
 }
 
 /**
- * Configuration for Supabase connection
+ * Get database connection mode from env (for logging)
  */
-interface SupabaseConfig {
-  url: string;
-  serviceRoleKey: string;
-  isLocal?: boolean;
+function getDbConfig(): { isLocal: boolean } {
+  const url = process.env.DATABASE_URL ?? "";
+  const isLocal = url.includes("127.0.0.1") || url.includes("localhost") || url.includes(":54322");
+  return { isLocal };
 }
 
 /**
- * Get Supabase configuration from environment or use defaults
- * Supports both local and remote Supabase instances
- */
-function getSupabaseConfig(): SupabaseConfig {
-  // Check for explicit local/remote flag
-  const useLocal = process.env.USE_LOCAL_SUPABASE === "true";
-  const useRemote = process.env.USE_REMOTE_SUPABASE === "true";
-
-  let url: string | undefined;
-  let serviceRoleKey: string | undefined;
-
-  if (useLocal) {
-    // Use local Supabase (default ports)
-    url = process.env.NEXT_PUBLIC_SUPABASE_URL || "http://127.0.0.1:55321";
-    serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-    if (!serviceRoleKey) {
-      // Try to get from supabase status if available
-      console.warn(
-        "SUPABASE_SERVICE_ROLE_KEY not set. Run 'bun run supabase:status' to get local credentials."
-      );
-    }
-  } else if (useRemote) {
-    // Use remote Supabase
-    url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  } else {
-    // Auto-detect from environment variables
-    url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-    serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  }
-
-  if (!url || !serviceRoleKey) {
-    throw new Error(
-      "Missing Supabase environment variables.\n" +
-        "For local: Set USE_LOCAL_SUPABASE=true and SUPABASE_SERVICE_ROLE_KEY (run 'bun run supabase:status')\n" +
-        "For remote: Set NEXT_PUBLIC_SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY in .env.local"
-    );
-  }
-
-  // Detect if local (default port 55321) or remote
-  const isLocal =
-    useLocal || url.includes("127.0.0.1") || url.includes("localhost") || url.includes(":55321");
-
-  return { url, serviceRoleKey, isLocal };
-}
-
-/**
- * Fetch already inserted recipe IDs from Supabase
+ * Fetch already inserted recipe IDs from the database
  */
 async function getExistingRecipeIds(): Promise<Set<string>> {
-  const supabase = createSupabaseServerClient();
   const existingIds = new Set<string>();
-
   console.log("Checking for existing recipes in database...");
 
   let offset = 0;
@@ -91,24 +43,18 @@ async function getExistingRecipeIds(): Promise<Set<string>> {
   let hasMore = true;
 
   while (hasMore) {
-    const { data, error } = await supabase
-      .from("recipes")
-      .select("original_id")
-      .range(offset, offset + limit - 1);
+    const rows = await db
+      .select({ originalId: recipes.originalId })
+      .from(recipes)
+      .limit(limit)
+      .offset(offset);
 
-    if (error) {
-      console.warn(`Warning: Error fetching existing recipes: ${error.message}`);
-      break;
-    }
-
-    if (data && data.length > 0) {
-      for (const row of data) {
-        if (row.original_id) {
-          existingIds.add(row.original_id);
-        }
+    if (rows.length > 0) {
+      for (const row of rows) {
+        if (row.originalId) existingIds.add(row.originalId);
       }
       offset += limit;
-      hasMore = data.length === limit;
+      hasMore = rows.length === limit;
     } else {
       hasMore = false;
     }
@@ -119,45 +65,52 @@ async function getExistingRecipeIds(): Promise<Set<string>> {
 }
 
 /**
- * Insert a batch of recipes with embeddings into Supabase
+ * Insert a batch of recipes with embeddings (upsert on original_id)
  */
 async function insertRecipeBatch(
-  recipes: RecipeWithEmbedding[]
+  batch: RecipeWithEmbedding[]
 ): Promise<{ success: number; failed: number }> {
-  const supabase = createSupabaseServerClient();
+  try {
+    const values = batch.map((recipe) => ({
+      originalId: recipe.original_id,
+      name: recipe.name,
+      ingredients: recipe.ingredients,
+      description: recipe.description ?? null,
+      url: recipe.url ?? null,
+      image: recipe.image ?? null,
+      cookTime: recipe.cook_time ?? null,
+      prepTime: recipe.prep_time ?? null,
+      recipeYield: recipe.recipe_yield ?? null,
+      datePublished: recipe.date_published?.split("T")[0] ?? null,
+      source: recipe.source ?? null,
+      embedding: recipe.embedding ?? null,
+    }));
 
-  // Prepare data for insertion
-  const insertData = recipes.map((recipe) => ({
-    original_id: recipe.original_id,
-    name: recipe.name,
-    ingredients: recipe.ingredients,
-    description: recipe.description,
-    url: recipe.url,
-    image: recipe.image,
-    cook_time: recipe.cook_time,
-    prep_time: recipe.prep_time,
-    recipe_yield: recipe.recipe_yield,
-    date_published: recipe.date_published?.split("T")[0] ?? null,
-    source: recipe.source,
-    embedding: recipe.embedding || null,
-  }));
-
-  // Insert batch
-  const { error } = await supabase.from("recipes").upsert(insertData, {
-    onConflict: "original_id",
-    ignoreDuplicates: false,
-  });
-
-  if (error) {
-    return { success: 0, failed: recipes.length };
+    await db
+      .insert(recipes)
+      .values(values)
+      .onConflictDoUpdate({
+        target: recipes.originalId,
+        set: {
+          name: sql`excluded.name`,
+          ingredients: sql`excluded.ingredients`,
+          description: sql`excluded.description`,
+          url: sql`excluded.url`,
+          image: sql`excluded.image`,
+          cookTime: sql`excluded.cook_time`,
+          prepTime: sql`excluded.prep_time`,
+          recipeYield: sql`excluded.recipe_yield`,
+          datePublished: sql`excluded.date_published`,
+          source: sql`excluded.source`,
+          embedding: sql`excluded.embedding`,
+        },
+      });
+    return { success: batch.length, failed: 0 };
+  } catch {
+    return { success: 0, failed: batch.length };
   }
-
-  return { success: recipes.length, failed: 0 };
 }
 
-/**
- * Main function
- */
 async function main() {
   const args = process.argv.slice(2);
   const inputFile = args[0] || join(process.cwd(), "recipes-parsed.json");
@@ -166,6 +119,13 @@ async function main() {
   const skipEmbeddings = args.includes("--skip-embeddings");
   const embeddingModel =
     args.find((arg) => arg.startsWith("--model="))?.split("=")[1] || "Xenova/all-MiniLM-L6-v2";
+
+  if (!process.env.DATABASE_URL) {
+    console.error(
+      "Missing DATABASE_URL. Set the direct Postgres connection string (e.g. from Supabase: Project Settings → Database, or local: postgresql://postgres:postgres@127.0.0.1:54322/postgres)"
+    );
+    process.exit(1);
+  }
 
   console.log("=".repeat(60));
   console.log("Recipe Vectorization & Upload Script");
@@ -179,17 +139,13 @@ async function main() {
   console.log("=".repeat(60));
   console.log();
 
-  // Load recipes
   console.log("Loading recipes...");
   const recipesData = readFileSync(inputFile, "utf-8");
-  const recipes: ParsedRecipe[] = JSON.parse(recipesData);
-  console.log(`Loaded ${recipes.length} recipes\n`);
+  const allRecipes: ParsedRecipe[] = JSON.parse(recipesData);
+  console.log(`Loaded ${allRecipes.length} recipes\n`);
 
-  // Get existing recipe IDs to skip
   const existingIds = await getExistingRecipeIds();
-
-  // Filter out already processed recipes
-  const recipesToProcess = recipes.filter((recipe) => !existingIds.has(recipe.original_id));
+  const recipesToProcess = allRecipes.filter((r) => !existingIds.has(r.original_id));
 
   if (recipesToProcess.length === 0) {
     console.log("All recipes are already in the database. Nothing to process.");
@@ -200,15 +156,12 @@ async function main() {
     `Processing ${recipesToProcess.length} new recipes (skipping ${existingIds.size} existing)\n`
   );
 
-  // Initialize counters
-  let totalSuccess = 0;
-  let totalFailed = 0;
-  const totalSkipped = existingIds.size;
-
-  // Process in batches: generate embeddings and insert immediately
-  const config = getSupabaseConfig();
+  const config = getDbConfig();
   console.log(`Processing mode: ${config.isLocal ? "Local" : "Remote"}`);
   console.log(`Batch size: ${batchSize} recipes per batch\n`);
+
+  let totalSuccess = 0;
+  let totalFailed = 0;
 
   for (let i = 0; i < recipesToProcess.length; i += batchSize) {
     const batch = recipesToProcess.slice(i, i + batchSize);
@@ -218,24 +171,20 @@ async function main() {
     console.log(`\n[Batch ${batchNumber}/${totalBatches}] Processing ${batch.length} recipes...`);
 
     try {
-      // Generate embeddings for this batch
       let batchWithEmbeddings: RecipeWithEmbedding[] = batch;
 
       if (!skipEmbeddings) {
         const texts = batch.map((recipe) => prepareTextForEmbedding(recipe));
         const embeddings = await generateEmbeddingsBatch(texts, embeddingModel, embeddingBatchSize);
-
         batchWithEmbeddings = batch.map((recipe, index) => ({
           ...recipe,
           embedding: embeddings[index] || undefined,
         }));
-
         console.log(`  ✓ Generated ${embeddings.length} embeddings for batch ${batchNumber}`);
       } else {
         console.log(`  ⏭ Skipping embedding generation for batch ${batchNumber}`);
       }
 
-      // Immediately insert this batch
       const result = await insertRecipeBatch(batchWithEmbeddings);
 
       if (result.failed > 0) {
@@ -246,34 +195,26 @@ async function main() {
 
       totalSuccess += result.success;
       totalFailed += result.failed;
+
+      const processed = Math.min(i + batchSize, recipesToProcess.length);
+      console.log(
+        `  Progress: ${processed}/${recipesToProcess.length} recipes processed (${totalSuccess} inserted, ${totalFailed} failed)`
+      );
     } catch (error) {
       console.error(`  ✗ Error processing batch ${batchNumber}:`, error);
       totalFailed += batch.length;
     }
-
-    // Progress summary
-    const processed = Math.min(i + batchSize, recipesToProcess.length);
-    console.log(
-      `  Progress: ${processed}/${recipesToProcess.length} recipes processed (${totalSuccess} inserted, ${totalFailed} failed)`
-    );
   }
-
-  const result = {
-    success: totalSuccess,
-    failed: totalFailed,
-    skipped: totalSkipped,
-  };
 
   console.log(`\n${"=".repeat(60)}`);
   console.log("Upload Complete");
   console.log("=".repeat(60));
-  console.log(`✓ Successfully inserted: ${result.success}`);
-  console.log(`✗ Failed: ${result.failed}`);
-  console.log(`⏭ Skipped (already exists): ${result.skipped}`);
+  console.log(`✓ Successfully inserted: ${totalSuccess}`);
+  console.log(`✗ Failed: ${totalFailed}`);
+  console.log(`⏭ Skipped (already exists): ${existingIds.size}`);
   console.log("=".repeat(60));
 }
 
-// Run if executed directly
 if (import.meta.main) {
   main().catch((error) => {
     console.error("Fatal error:", error);
@@ -281,4 +222,4 @@ if (import.meta.main) {
   });
 }
 
-export { insertRecipeBatch, getSupabaseConfig, getExistingRecipeIds };
+export { insertRecipeBatch, getDbConfig, getExistingRecipeIds };

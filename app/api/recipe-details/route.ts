@@ -1,3 +1,5 @@
+import { db } from "@/lib/db";
+import { recipes } from "@/lib/db/schema";
 import { generateStructuredContent } from "@/lib/gemini";
 import {
   PromptType,
@@ -8,8 +10,8 @@ import {
 } from "@/lib/prompts";
 import type { RecipeDetailsResponse } from "@/lib/prompts";
 import { rateLimit } from "@/lib/rate-limit";
-import { createSupabaseServerClient } from "@/lib/supabase";
 import type { Recipe } from "@/types/recipe";
+import { eq } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -23,6 +25,29 @@ const recipeDetailsRequestSchema = z
     message: "Either recipeId or recipeUrl must be provided",
   });
 
+/** Map DB row (snake_case) to Recipe type */
+function rowToRecipe(row: typeof recipes.$inferSelect): Recipe {
+  return {
+    id: row.id,
+    original_id: row.originalId ?? "",
+    name: row.name,
+    ingredients: row.ingredients,
+    description: row.description ?? undefined,
+    url: row.url ?? undefined,
+    image: row.image ?? undefined,
+    cook_time: row.cookTime ?? undefined,
+    prep_time: row.prepTime ?? undefined,
+    recipe_yield: row.recipeYield ?? undefined,
+    date_published: row.datePublished ?? undefined,
+    source: row.source ?? undefined,
+    cooking_instructions: row.cookingInstructions ?? undefined,
+    additional_info: (row.additionalInfo as Recipe["additional_info"]) ?? undefined,
+    instructions_fetched_at: row.instructionsFetchedAt?.toISOString(),
+    created_at: row.createdAt?.toISOString(),
+    updated_at: row.updatedAt?.toISOString(),
+  };
+}
+
 /**
  * POST /api/recipe-details
  * Fetch detailed recipe information including cooking instructions
@@ -31,10 +56,9 @@ const recipeDetailsRequestSchema = z
  */
 export async function POST(request: NextRequest) {
   try {
-    // Rate limiting: 10 requests per minute per IP
     const { result: rateLimitResult, headers: rateLimitHeaders } = rateLimit(request, {
       maxRequests: 10,
-      windowMs: 60 * 1000, // 1 minute
+      windowMs: 60 * 1000,
     });
 
     if (!rateLimitResult.allowed) {
@@ -46,49 +70,32 @@ export async function POST(request: NextRequest) {
           ).toISOString()}`,
           retryAfter: Math.ceil((rateLimitResult.resetAt - Date.now()) / 1000),
         },
-        {
-          status: 429,
-          headers: rateLimitHeaders,
-        }
+        { status: 429, headers: rateLimitHeaders }
       );
     }
 
-    // Parse and validate request body
     const body = await request.json();
     const { recipeId, recipeUrl } = recipeDetailsRequestSchema.parse(body);
 
-    const supabase = createSupabaseServerClient();
-
-    // Fetch recipe from database
     let recipe: Recipe | null = null;
     if (recipeId) {
-      const { data, error } = await supabase
-        .from("recipes")
-        .select("*")
-        .eq("id", recipeId)
-        .single();
-
-      if (error || !data) {
+      const [row] = await db.select().from(recipes).where(eq(recipes.id, recipeId)).limit(1);
+      if (!row) {
         return NextResponse.json(
-          { error: "Recipe not found", details: error?.message },
+          { error: "Recipe not found", details: "No recipe with this id" },
           { status: 404 }
         );
       }
-      recipe = data;
+      recipe = rowToRecipe(row);
     } else if (recipeUrl) {
-      const { data, error } = await supabase
-        .from("recipes")
-        .select("*")
-        .eq("url", recipeUrl)
-        .single();
-
-      if (error || !data) {
+      const [row] = await db.select().from(recipes).where(eq(recipes.url, recipeUrl)).limit(1);
+      if (!row) {
         return NextResponse.json(
-          { error: "Recipe not found", details: error?.message },
+          { error: "Recipe not found", details: "No recipe with this url" },
           { status: 404 }
         );
       }
-      recipe = data;
+      recipe = rowToRecipe(row);
     } else {
       return NextResponse.json(
         { error: "Either recipeId or recipeUrl must be provided" },
@@ -96,14 +103,11 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // TypeScript guard: recipe should never be null at this point
     if (!recipe) {
       return NextResponse.json({ error: "Recipe not found" }, { status: 404 });
     }
 
-    // Check if cooking instructions already exist in database
     if (recipe.cooking_instructions && recipe.instructions_fetched_at) {
-      // Return cached data
       return NextResponse.json(
         {
           cooking_instructions: recipe.cooking_instructions,
@@ -111,22 +115,18 @@ export async function POST(request: NextRequest) {
           cached: true,
           fetched_at: recipe.instructions_fetched_at,
         },
-        {
-          headers: rateLimitHeaders,
-        }
+        { headers: rateLimitHeaders }
       );
     }
 
-    // Generate cooking instructions using Gemini AI
-    let recipeDetails: RecipeDetailsResponse;
     const context = {
       recipeName: recipe.name,
       ingredients: recipe.ingredients,
       url: recipe.url,
     };
+    let recipeDetails: RecipeDetailsResponse;
 
     try {
-      // Primary method: Try URL extraction if URL is available
       if (recipe.url) {
         try {
           validatePromptContext(PromptType.RECIPE_URL_EXTRACTION, context);
@@ -136,9 +136,7 @@ export async function POST(request: NextRequest) {
             recipeDetailsSchema,
             "gemini-2.5-flash-lite"
           );
-        } catch (urlError) {
-          console.warn("URL extraction failed, trying web search:", urlError);
-          // Fallback to web search
+        } catch {
           validatePromptContext(PromptType.RECIPE_WEB_SEARCH, context);
           const prompt = getPrompt(PromptType.RECIPE_WEB_SEARCH, context);
           recipeDetails = await generateStructuredContent<RecipeDetailsResponse>(
@@ -148,7 +146,6 @@ export async function POST(request: NextRequest) {
           );
         }
       } else {
-        // No URL, use web search directly
         validatePromptContext(PromptType.RECIPE_WEB_SEARCH, context);
         const prompt = getPrompt(PromptType.RECIPE_WEB_SEARCH, context);
         recipeDetails = await generateStructuredContent<RecipeDetailsResponse>(
@@ -158,25 +155,17 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      // Validate the response with Zod schema
       const validatedDetails = recipeDetailsZodSchema.parse(recipeDetails);
 
-      // Store in database for future use (cache)
-      const { error: updateError } = await supabase
-        .from("recipes")
-        .update({
-          cooking_instructions: validatedDetails.cooking_instructions,
-          additional_info: validatedDetails.additional_info || null,
-          instructions_fetched_at: new Date().toISOString(),
+      await db
+        .update(recipes)
+        .set({
+          cookingInstructions: validatedDetails.cooking_instructions,
+          additionalInfo: validatedDetails.additional_info ?? null,
+          instructionsFetchedAt: new Date(),
         })
-        .eq("id", recipe.id);
+        .where(eq(recipes.id, recipe.id));
 
-      if (updateError) {
-        console.error("Error updating recipe details in database:", updateError);
-        // Continue even if database update fails
-      }
-
-      // Return structured data
       return NextResponse.json(
         {
           cooking_instructions: validatedDetails.cooking_instructions,
@@ -184,9 +173,7 @@ export async function POST(request: NextRequest) {
           cached: false,
           fetched_at: new Date().toISOString(),
         },
-        {
-          headers: rateLimitHeaders,
-        }
+        { headers: rateLimitHeaders }
       );
     } catch (geminiError) {
       console.error("Error fetching recipe details from Gemini:", geminiError);

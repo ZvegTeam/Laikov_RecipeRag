@@ -1,7 +1,8 @@
+import { db } from "@/lib/db";
 import { embeddingCacheService } from "@/lib/embedding-cache";
 import { generateEmbedding } from "@/lib/embeddings";
-import { createSupabaseServerClient } from "@/lib/supabase";
 import type { Recipe } from "@/types/recipe";
+import { sql } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -26,7 +27,6 @@ function getEmbeddingCacheKey(ingredients: string[]): string {
  */
 export async function POST(request: NextRequest) {
   try {
-    // Parse and validate request body
     const body = await request.json();
     const { ingredients, limit } = searchSchema.parse(body);
 
@@ -39,32 +39,20 @@ export async function POST(request: NextRequest) {
       void embeddingCacheService.set(cacheKey, queryEmbedding);
     }
 
-    // Query Supabase using cosine similarity via RPC function
-    const supabase = createSupabaseServerClient();
+    const vectorLiteral = `[${queryEmbedding.join(",")}]`;
+    const result = await db.execute(
+      sql`SELECT id, original_id, name, ingredients, description, url, image, cook_time, prep_time, recipe_yield, date_published, source, cooking_instructions, additional_info, instructions_fetched_at, created_at, updated_at, (1 - (embedding <=> ${vectorLiteral}::vector)) AS similarity
+         FROM recipes
+         WHERE embedding IS NOT NULL
+           AND (1 - (embedding <=> ${vectorLiteral}::vector)) >= 0.3
+         ORDER BY embedding <=> ${vectorLiteral}::vector
+         LIMIT ${limit}`
+    );
+    const data = Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? []);
 
-    // Use RPC function for efficient vector similarity search
-    const { data, error } = await supabase.rpc("search_recipes_by_embedding", {
-      query_embedding: queryEmbedding,
-      match_threshold: 0.3, // Minimum similarity threshold (0-1, lower = more results)
-      match_count: limit,
-    });
-
-    if (error) {
-      console.error("Error searching recipes:", error);
-      return NextResponse.json(
-        {
-          error: "Failed to search recipes",
-          details: error.message,
-          hint: "Make sure the search_recipes_by_embedding function exists in the database. Run migration 003_create_search_function.sql",
-        },
-        { status: 500 }
-      );
-    }
-
-    // Return results from RPC function
     return NextResponse.json({
-      recipes: (data as Recipe[]) || [],
-      count: data?.length || 0,
+      recipes: data as Recipe[],
+      count: (data as Recipe[]).length,
     });
   } catch (error) {
     console.error("Search API error:", error);
