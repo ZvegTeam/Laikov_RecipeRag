@@ -20,12 +20,13 @@ CREATE TABLE IF NOT EXISTS recipes (
   updated_at TIMESTAMP DEFAULT NOW()
 );
 
--- Create index for vector similarity search using IVFFlat
--- Note: IVFFlat requires at least some data before creating index
--- Consider creating index after initial data load, or use HNSW for better accuracy
-CREATE INDEX IF NOT EXISTS recipes_embedding_idx ON recipes 
-USING ivfflat (embedding vector_cosine_ops)
-WITH (lists = 100);
+-- HNSW index for vector similarity search (better accuracy/recall, works with empty table)
+-- Alternative for very large tables: IVFFlat with lists ~ row_count/1000 (requires data before creation)
+CREATE INDEX IF NOT EXISTS recipes_embedding_idx ON recipes
+USING hnsw (embedding vector_cosine_ops)
+WITH (m = 16, ef_construction = 64);
+
+COMMENT ON INDEX recipes_embedding_idx IS 'HNSW index for cosine similarity search; m=16 (connections), ef_construction=64 (build quality).';
 
 -- Create index on original_id for faster lookups
 CREATE INDEX IF NOT EXISTS recipes_original_id_idx ON recipes (original_id);

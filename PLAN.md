@@ -278,13 +278,13 @@ rag-ai/
 ### Phase 5: Optimization & Polish
 
 #### 5.1 Performance
-- [ ] Optimize embedding generation:
-  - Cache embeddings for common ingredient combinations
-  - Batch API calls where possible
-- [ ] Optimize database queries:
-  - Fine-tune IVFFlat index parameters
-  - Consider HNSW index for better accuracy (if needed)
-- [ ] Implement client-side caching for search results
+- [x] Optimize embedding generation:
+  - Cache embeddings for common ingredient combinations (in-memory cache in lib/embeddings, used by search API; TTL 5 min, max 500 entries)
+  - Batch API calls where possible (vectorize-data.ts already uses generateEmbeddingsBatch; search API is one query per request)
+- [x] Optimize database queries:
+  - Fine-tune IVFFlat index parameters (documented in migration 004; use IVFFlat with lists ~ row_count/1000 if preferred)
+  - Consider HNSW index for better accuracy (if needed) — migration 004 switches to HNSW
+- [x] Implement client-side caching for search results
 
 #### 5.2 User Experience
 - [ ] Add ingredient suggestions/autocomplete

@@ -3,7 +3,10 @@
 import type { Recipe } from "@/types/recipe";
 import { Alert, Box, Button, Flex, Stack, Textarea, type TextareaProps } from "@mantine/core";
 import { useForm } from "@mantine/form";
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
+
+/** Cache TTL: 30 minutes */
+const SEARCH_CACHE_TTL_MS = 30 * 60 * 1000;
 
 /** Parse multiline text into non-empty trimmed ingredient strings (one per line). */
 function parseIngredients(value: string): string[] {
@@ -11,6 +14,15 @@ function parseIngredients(value: string): string[] {
     .split(/\r?\n/)
     .map((s) => s.trim())
     .filter(Boolean);
+}
+
+/** Build a stable cache key from ingredients (sorted, lowercased) so "chicken, garlic" and "garlic, chicken" hit the same cache. */
+function getSearchCacheKey(ingredients: string[]): string {
+  return ingredients
+    .map((s) => s.toLowerCase().trim())
+    .filter(Boolean)
+    .sort()
+    .join(",");
 }
 
 export interface SearchFormProps {
@@ -24,6 +36,11 @@ export interface SearchFormProps {
   minRows?: TextareaProps["minRows"];
 }
 
+interface SearchCacheEntry {
+  recipes: Recipe[];
+  timestamp: number;
+}
+
 export function SearchForm({
   onResults,
   onLoadingChange,
@@ -32,6 +49,7 @@ export function SearchForm({
 }: SearchFormProps) {
   const [loading, setLoading] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const searchCacheRef = useRef<Map<string, SearchCacheEntry>>(new Map());
 
   const form = useForm({
     initialValues: { ingredientsText: "" },
@@ -51,6 +69,14 @@ export function SearchForm({
       if (ingredients.length === 0) return;
 
       setSubmitError(null);
+
+      const cacheKey = getSearchCacheKey(ingredients);
+      const cached = searchCacheRef.current.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < SEARCH_CACHE_TTL_MS) {
+        onResults?.(cached.recipes);
+        return;
+      }
+
       setLoading(true);
       onLoadingChange?.(true);
 
@@ -69,7 +95,9 @@ export function SearchForm({
           return;
         }
 
-        onResults?.(data.recipes ?? []);
+        const recipes = data.recipes ?? [];
+        searchCacheRef.current.set(cacheKey, { recipes, timestamp: Date.now() });
+        onResults?.(recipes);
       } catch (err) {
         setSubmitError(err instanceof Error ? err.message : "Something went wrong");
       } finally {

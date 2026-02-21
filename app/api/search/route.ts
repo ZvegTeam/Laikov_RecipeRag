@@ -1,3 +1,4 @@
+import { embeddingCacheService } from "@/lib/embedding-cache";
 import { generateEmbedding } from "@/lib/embeddings";
 import { createSupabaseServerClient } from "@/lib/supabase";
 import type { Recipe } from "@/types/recipe";
@@ -10,6 +11,15 @@ const searchSchema = z.object({
   limit: z.number().int().min(1).max(50).optional().default(20),
 });
 
+/** Stable cache key from ingredients (sorted, lowercased) so order-independent queries hit the same embedding cache. */
+function getEmbeddingCacheKey(ingredients: string[]): string {
+  return ingredients
+    .map((s) => s.toLowerCase().trim())
+    .filter(Boolean)
+    .sort()
+    .join(",");
+}
+
 /**
  * POST /api/search
  * Search for recipes based on ingredients using vector similarity
@@ -20,10 +30,14 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { ingredients, limit } = searchSchema.parse(body);
 
-    // Generate embedding for the ingredient list
-    // Format: "Find recipes with these ingredients: {ingredient1}, {ingredient2}, ..."
     const queryText = `Find recipes with these ingredients: ${ingredients.join(", ")}`;
-    const queryEmbedding = await generateEmbedding(queryText);
+    const cacheKey = getEmbeddingCacheKey(ingredients);
+
+    let queryEmbedding = await embeddingCacheService.get(cacheKey);
+    if (!queryEmbedding) {
+      queryEmbedding = await generateEmbedding(queryText);
+      void embeddingCacheService.set(cacheKey, queryEmbedding);
+    }
 
     // Query Supabase using cosine similarity via RPC function
     const supabase = createSupabaseServerClient();
