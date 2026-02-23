@@ -1,18 +1,12 @@
+import { serverEnv } from "@/lib/env.server";
 import { GoogleGenAI } from "@google/genai";
 
 /**
- * Initialize Gemini AI client using @google/genai SDK
+ * Initialize Gemini AI client using @google/genai SDK.
+ * Uses validated env (serverEnv) so API key is always defined.
  */
 export function createGeminiClient() {
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
-    throw new Error(
-      "Missing GEMINI_API_KEY environment variable. Please check your .env.local file."
-    );
-  }
-
-  return new GoogleGenAI({ apiKey });
+  return new GoogleGenAI({ apiKey: serverEnv.GEMINI_API_KEY });
 }
 
 /** JSON schema shape accepted by @google/genai for structured output */
@@ -24,23 +18,20 @@ export type StructuredOutputSchema = {
 };
 
 /**
- * Generate content using Gemini AI with structured JSON output
- * Uses JSON schema to ensure consistent response format
- * @param prompt - Prompt text
- * @param schema - JSON schema for structured output (without additionalProperties etc.)
- * @param model - Model name (default: gemini-1.5-pro)
- * @returns Parsed JSON response
+ * Generate content using Gemini AI with structured JSON output.
+ * Uses validated env for model (serverEnv) so model is always a string.
  */
 export async function generateStructuredContent<T>(
   prompt: string,
   schema: StructuredOutputSchema,
-  model = "gemini-1.5-pro"
+  model?: string
 ): Promise<T> {
-  const ai = createGeminiClient();
+  const resolvedModel: string = model ?? serverEnv.GEMINI_MODEL;
 
+  const ai = createGeminiClient();
   try {
     const response = await ai.models.generateContent({
-      model,
+      model: resolvedModel,
       contents: prompt,
       config: {
         responseMimeType: "application/json",

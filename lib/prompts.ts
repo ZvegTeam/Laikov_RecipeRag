@@ -14,7 +14,7 @@ export enum PromptType {
   // INGREDIENT_SUBSTITUTION = "ingredient_substitution",
 }
 
-interface RecipeContext {
+export interface RecipeContext {
   recipeName: string;
   ingredients: string;
   url?: string;

@@ -25,6 +25,8 @@
   },
   "dependencies": {
     "@google/genai": "^1.40.0",
+    "@langchain/core": "^1.1.27",
+    "@langchain/google-genai": "^2.1.20",
     "@mantine/core": "^7.14.0",
     "@mantine/form": "^7.14.0",
     "@mantine/hooks": "^7.14.0",

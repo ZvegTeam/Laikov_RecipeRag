@@ -307,6 +307,62 @@ rag-ai/
 - [ ] Test edge cases (empty ingredients, no results, etc.)
 - [ ] Performance testing with large dataset
 
+### Phase 6: LangChain Integration (Optional)
+
+Integrate [LangChain](https://js.langchain.com/) to standardize prompt management, structured output, and RAG flows. Current stack (Gemini + custom prompts + Zod) remains valid; LangChain adds reusable chains and a consistent abstraction.
+
+#### 6.1 Recipe-details chain (high value)
+- [x] Install LangChain packages (e.g. `@langchain/core`, `@langchain/google-genai`, `langchain`).
+- [x] Create `lib/chains/recipe-details-chain.ts`:
+  - [x] Chain input: recipe context (name, ingredients, url).
+  - [x] Step 1: Choose prompt branch (URL extraction vs web search) based on presence of `url`.
+  - [x] Step 2: Call LLM (ChatGoogleGenerativeAI or equivalent) with the selected prompt template.
+  - [x] Step 3: Use LangChain structured output (e.g. `withStructuredOutput`) with existing `recipeDetailsZodSchema` so the chain returns a typed, Zod-validated object.
+  - [x] Step 4: Return parsed `RecipeDetailsResponse` (no manual JSON parse or zodToJsonSchema in route).
+- [x] Refactor `app/api/recipe-details/route.ts`:
+  - [x] Keep: fetch recipe from DB, cache check, rate limiting, persist result to DB.
+  - [x] Replace: manual `getPrompt` + `generateStructuredContent` + `recipeDetailsZodSchema.parse` with a single chain invocation.
+- [x] Preserve existing API contract and DB caching behavior.
+
+#### 6.2 Prompt management with LangChain templates
+- [ ] Replace or wrap `lib/prompts.ts` with LangChain prompt templates:
+  - [ ] Use `ChatPromptTemplate.fromTemplate()` (or similar) for URL extraction and web-search prompts.
+  - [ ] Template variables: `recipeName`, `ingredients`, `url` (optional).
+  - [ ] Keep a single registry keyed by `PromptType` (or equivalent) for maintainability.
+- [ ] Optionally add few-shot examples later via `FewShotPromptTemplate` without changing API or chain interface.
+- [ ] Keep `validatePromptContext()` (or equivalent) for input validation before running the chain.
+
+#### 6.3 Structured output (Gemini) via LangChain
+- [ ] Replace hand-rolled `lib/gemini.ts` structured flow where used by recipe-details:
+  - [ ] Use ChatGoogleGenerativeAI (or LangChain’s Gemini integration) with `withStructuredOutput(recipeDetailsZodSchema)` (or equivalent).
+  - [ ] Single place for “call Gemini and get typed, validated object”; remove or simplify custom `generateStructuredContent` + manual schema conversion for this use case.
+- [ ] Ensure Zod schema remains the single source of truth for response shape.
+
+#### 6.4 Retriever abstraction (optional)
+- [ ] Implement a LangChain `Retriever` that wraps existing search:
+  - [ ] Input: user message (e.g. ingredients string).
+  - [ ] Internal steps: run current flow (embed query → binary quantize → Drizzle/pgvector) and return recipe documents.
+  - [ ] Output: LangChain `Document[]` (or equivalent) for use in chains.
+- [ ] Use this retriever in a RAG chain when adding features such as:
+  - [ ] “Given ingredients, retrieve top N recipes and summarize” or “What can I make with X?” using retrieved recipes as context.
+
+#### 6.5 Document loaders (future)
+- [ ] When adding ingestion from URLs or PDFs:
+  - [ ] Use LangChain document loaders (e.g. Cheerio, Puppeteer, PDF) to fetch and split content.
+  - [ ] Feed output into existing embedding + vectorize pipeline (keep Drizzle + pgvector + bit(384) as-is).
+  - [ ] LangChain owns “URL/PDF → documents/chunks”; existing DB and indexing unchanged.
+
+#### 6.6 Embeddings via LangChain (optional)
+- [ ] If standardizing on LangChain’s embedding interface:
+  - [ ] Use `HuggingFaceTransformersEmbeddings` (or equivalent) for the “text → vector” step only.
+  - [ ] Keep Drizzle + pgvector and current binary quantization logic; ensure dimension stays 384 and quantization remains correct.
+- [ ] Only adopt if the goal is to reduce custom pipeline code and accept possible model/API differences.
+
+#### 6.7 Agents / tools (future)
+- [ ] When adding features like “substitute ingredient”, “scale recipe”, or “find similar recipes”:
+  - [ ] Expose each as a LangChain tool and compose them in an agent.
+  - [ ] Enables natural-language flows (e.g. “Replace butter with oil and scale to 4 servings”).
+
 ## Data Schema Details
 
 ### Recipe Object Structure
