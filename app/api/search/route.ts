@@ -1,18 +1,17 @@
 import { db } from "@/lib/db";
 import { embeddingCacheService } from "@/lib/embedding-cache";
 import { generateEmbedding } from "@/lib/embeddings";
+import { binaryQuantize } from "@/lib/quantize";
 import type { Recipe } from "@/types/recipe";
 import { sql } from "drizzle-orm";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
-// Request body schema
 const searchSchema = z.object({
   ingredients: z.array(z.string()).min(1, "At least one ingredient is required"),
   limit: z.number().int().min(1).max(50).optional().default(20),
 });
 
-/** Stable cache key from ingredients (sorted, lowercased) so order-independent queries hit the same embedding cache. */
 function getEmbeddingCacheKey(ingredients: string[]): string {
   return ingredients
     .map((s) => s.toLowerCase().trim())
@@ -23,7 +22,7 @@ function getEmbeddingCacheKey(ingredients: string[]): string {
 
 /**
  * POST /api/search
- * Search for recipes based on ingredients using vector similarity
+ * Search recipes by ingredients using binary-quantized embeddings (bit(384)) and HNSW (Hamming).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -39,20 +38,29 @@ export async function POST(request: NextRequest) {
       void embeddingCacheService.set(cacheKey, queryEmbedding);
     }
 
-    const vectorLiteral = `[${queryEmbedding.join(",")}]`;
+    const queryBit = binaryQuantize(queryEmbedding);
+
     const result = await db.execute(
-      sql`SELECT id, original_id, name, ingredients, description, url, image, cook_time, prep_time, recipe_yield, date_published, source, cooking_instructions, additional_info, instructions_fetched_at, created_at, updated_at, (1 - (embedding <=> ${vectorLiteral}::vector)) AS similarity
-         FROM recipes
-         WHERE embedding IS NOT NULL
-           AND (1 - (embedding <=> ${vectorLiteral}::vector)) >= 0.3
-         ORDER BY embedding <=> ${vectorLiteral}::vector
-         LIMIT ${limit}`
+      sql`
+        SELECT
+          r.id, r.original_id, r.name, r.ingredients, r.description, r.url, r.image,
+          r.cook_time, r.prep_time, r.recipe_yield, r.date_published, r.source,
+          r.cooking_instructions, r.additional_info, r.instructions_fetched_at,
+          r.created_at, r.updated_at,
+          (1 - ((e.embedding <~> ${queryBit}::bit(384)) / 384.0)) AS similarity
+        FROM recipes r
+        INNER JOIN recipe_embeddings e ON e.recipe_id = r.id
+        ORDER BY e.embedding <~> ${queryBit}::bit(384)
+        LIMIT ${limit}
+      `
     );
-    const data = Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? []);
+
+    const rows = Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? []);
+    const recipesList = rows as (Recipe & { similarity: number })[];
 
     return NextResponse.json({
-      recipes: data as Recipe[],
-      count: (data as Recipe[]).length,
+      recipes: recipesList,
+      count: recipesList.length,
     });
   } catch (error) {
     console.error("Search API error:", error);

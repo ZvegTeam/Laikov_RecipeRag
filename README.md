@@ -60,6 +60,8 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
    
    This will apply all migrations from `supabase/migrations/`.
 
+   **Drop DB and push from scratch**: To reset the database and reapply all migrations (e.g. after schema changes), run `bun run supabase:reset`. Then load recipes and binary-quantized embeddings with `bun run vectorize recipes-parsed.json`.
+
 5. **Get local credentials**:
    ```bash
    bun run supabase:status

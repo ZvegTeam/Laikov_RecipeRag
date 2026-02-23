@@ -1,39 +1,32 @@
 #!/usr/bin/env bun
 /**
- * Vectorize and upload recipe data to the database (Drizzle ORM)
- * Supports both local and remote Postgres (e.g. Supabase)
- * Processes in batches: generates embeddings and inserts immediately
- * Skips already processed recipes to allow resuming
+ * Vectorize and upload recipe data: recipes (metadata) + recipe_embeddings (binary bit(384)).
+ * Drop DB and push from scratch: run `bun run supabase:reset` then this script.
  */
 
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { sql } from "drizzle-orm";
+import { inArray, sql } from "drizzle-orm";
 import { db } from "../lib/db";
-import { recipes } from "../lib/db/schema";
+import { recipeEmbeddings, recipes } from "../lib/db/schema";
 import {
   generateEmbeddingsBatch,
   getEmbeddingDimension,
   prepareTextForEmbedding,
 } from "../lib/embeddings";
+import { binaryQuantize } from "../lib/quantize";
 import type { ParsedRecipe } from "../types/recipe";
 
 interface RecipeWithEmbedding extends ParsedRecipe {
   embedding?: number[];
 }
 
-/**
- * Get database connection mode from env (for logging)
- */
 function getDbConfig(): { isLocal: boolean } {
   const url = process.env.DATABASE_URL ?? "";
   const isLocal = url.includes("127.0.0.1") || url.includes("localhost") || url.includes(":54322");
   return { isLocal };
 }
 
-/**
- * Fetch already inserted recipe IDs from the database
- */
 async function getExistingRecipeIds(): Promise<Set<string>> {
   const existingIds = new Set<string>();
   console.log("Checking for existing recipes in database...");
@@ -65,13 +58,13 @@ async function getExistingRecipeIds(): Promise<Set<string>> {
 }
 
 /**
- * Insert a batch of recipes with embeddings (upsert on original_id)
+ * Insert batch: 1) upsert recipes (metadata only), 2) get ids, 3) upsert recipe_embeddings (bit(384)).
  */
 async function insertRecipeBatch(
   batch: RecipeWithEmbedding[]
 ): Promise<{ success: number; failed: number }> {
   try {
-    const values = batch.map((recipe) => ({
+    const recipeValues = batch.map((recipe) => ({
       originalId: recipe.original_id,
       name: recipe.name,
       ingredients: recipe.ingredients,
@@ -83,12 +76,11 @@ async function insertRecipeBatch(
       recipeYield: recipe.recipe_yield ?? null,
       datePublished: recipe.date_published?.split("T")[0] ?? null,
       source: recipe.source ?? null,
-      embedding: recipe.embedding ?? null,
     }));
 
     await db
       .insert(recipes)
-      .values(values)
+      .values(recipeValues)
       .onConflictDoUpdate({
         target: recipes.originalId,
         set: {
@@ -102,11 +94,37 @@ async function insertRecipeBatch(
           recipeYield: sql`excluded.recipe_yield`,
           datePublished: sql`excluded.date_published`,
           source: sql`excluded.source`,
-          embedding: sql`excluded.embedding`,
         },
       });
+
+    const originalIds = batch.map((r) => r.original_id);
+    const idRows = await db
+      .select({ id: recipes.id, originalId: recipes.originalId })
+      .from(recipes)
+      .where(inArray(recipes.originalId, originalIds));
+
+    const idByOriginal = new Map(idRows.map((r) => [r.originalId, r.id]));
+
+    const embeddingRows: { recipeId: string; embedding: string }[] = [];
+    for (const r of batch) {
+      const id = r.embedding ? idByOriginal.get(r.original_id) : undefined;
+      if (id && r.embedding)
+        embeddingRows.push({ recipeId: id, embedding: binaryQuantize(r.embedding) });
+    }
+
+    if (embeddingRows.length > 0) {
+      await db
+        .insert(recipeEmbeddings)
+        .values(embeddingRows)
+        .onConflictDoUpdate({
+          target: recipeEmbeddings.recipeId,
+          set: { embedding: sql`excluded.embedding` },
+        });
+    }
+
     return { success: batch.length, failed: 0 };
-  } catch {
+  } catch (e) {
+    console.error("insertRecipeBatch error:", e);
     return { success: 0, failed: batch.length };
   }
 }
@@ -128,13 +146,15 @@ async function main() {
   }
 
   console.log("=".repeat(60));
-  console.log("Recipe Vectorization & Upload Script");
+  console.log("Recipe Vectorization & Upload (recipes + bit(384) embeddings)");
   console.log("=".repeat(60));
   console.log(`Input file: ${inputFile}`);
   console.log(`Batch size: ${batchSize}`);
   console.log(`Embedding batch size: ${embeddingBatchSize}`);
   console.log(`Embedding model: ${embeddingModel}`);
-  console.log(`Embedding dimension: ${getEmbeddingDimension(embeddingModel)}`);
+  console.log(
+    `Embedding dimension: ${getEmbeddingDimension(embeddingModel)} (binary quantized to bit(384))`
+  );
   console.log(`Skip embeddings: ${skipEmbeddings}`);
   console.log("=".repeat(60));
   console.log();
@@ -180,7 +200,7 @@ async function main() {
           ...recipe,
           embedding: embeddings[index] || undefined,
         }));
-        console.log(`  ✓ Generated ${embeddings.length} embeddings for batch ${batchNumber}`);
+        console.log(`  ✓ Generated ${embeddings.length} embeddings (binary quantized to bit(384))`);
       } else {
         console.log(`  ⏭ Skipping embedding generation for batch ${batchNumber}`);
       }
@@ -190,7 +210,9 @@ async function main() {
       if (result.failed > 0) {
         console.error(`  ✗ Failed to insert ${result.failed} recipes from batch ${batchNumber}`);
       } else {
-        console.log(`  ✓ Inserted ${result.success} recipes from batch ${batchNumber}`);
+        console.log(
+          `  ✓ Inserted ${result.success} recipes + embeddings from batch ${batchNumber}`
+        );
       }
 
       totalSuccess += result.success;
