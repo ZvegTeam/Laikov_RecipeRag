@@ -325,12 +325,12 @@ Integrate [LangChain](https://js.langchain.com/) to standardize prompt managemen
 - [x] Preserve existing API contract and DB caching behavior.
 
 #### 6.2 Prompt management with LangChain templates
-- [ ] Replace or wrap `lib/prompts.ts` with LangChain prompt templates:
-  - [ ] Use `ChatPromptTemplate.fromTemplate()` (or similar) for URL extraction and web-search prompts.
-  - [ ] Template variables: `recipeName`, `ingredients`, `url` (optional).
-  - [ ] Keep a single registry keyed by `PromptType` (or equivalent) for maintainability.
+- [x] Replace or wrap `lib/prompts.ts` with LangChain prompt templates:
+  - [x] Use `ChatPromptTemplate.fromTemplate()` (or similar) for URL extraction and web-search prompts.
+  - [x] Template variables: `recipeName`, `ingredients`, `url` (optional).
+  - [x] Keep a single registry keyed by `PromptType` (or equivalent) for maintainability.
 - [ ] Optionally add few-shot examples later via `FewShotPromptTemplate` without changing API or chain interface.
-- [ ] Keep `validatePromptContext()` (or equivalent) for input validation before running the chain.
+- [x] Keep `validatePromptContext()` (or equivalent) for input validation before running the chain.
 
 #### 6.3 Structured output (Gemini) via LangChain
 - [ ] Replace hand-rolled `lib/gemini.ts` structured flow where used by recipe-details:

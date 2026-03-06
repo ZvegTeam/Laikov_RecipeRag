@@ -1,4 +1,4 @@
-import { runRecipeDetailsChainWithFallback } from "@/lib/chains/recipe-details-chain";
+import { recipeDetailsChain } from "@/lib/chains/recipe-details-chain";
 import { db } from "@/lib/db";
 import { recipes } from "@/lib/db/schema";
 import type { RecipeDetailsResponse } from "@/lib/prompts";
@@ -15,7 +15,7 @@ export async function fetchAndSaveRecipeDetails(
   rateLimitHeaders?: HeadersInit
 ): Promise<NextResponse> {
   try {
-    const validatedDetails: RecipeDetailsResponse = await runRecipeDetailsChainWithFallback({
+    const validatedDetails: RecipeDetailsResponse = await recipeDetailsChain.runWithFallback({
       recipeName: recipe.name,
       ingredients: recipe.ingredients,
       url: recipe.url,

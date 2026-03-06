@@ -1,69 +1,41 @@
+import { GeminiLlmService } from "@/lib/llm";
 import {
+  type IPromptsService,
   PromptType,
   type RecipeContext,
-  getPrompt,
+  defaultPromptsService,
   recipeDetailsZodSchema,
-  validatePromptContext,
 } from "@/lib/prompts";
 import type { RecipeDetailsResponse } from "@/lib/prompts";
-import type { BaseLanguageModelInput } from "@langchain/core/language_models/base";
-import { HumanMessage } from "@langchain/core/messages";
-import type { Runnable } from "@langchain/core/runnables";
-import { ChatGoogleGenerativeAI } from "@langchain/google-genai";
+import type { BaseMessage } from "@langchain/core/messages";
+
+/** LLM that generates RecipeDetailsResponse from messages */
+export interface IRecipeDetailsLlm {
+  generate(messages: BaseMessage[]): Promise<RecipeDetailsResponse>;
+}
+
+const defaultLlm: IRecipeDetailsLlm = new GeminiLlmService<RecipeDetailsResponse>({
+  responseSchema: recipeDetailsZodSchema,
+});
 
 export interface RecipeDetailsChainOptions {
-  /** Override API key (default: GEMINI_API_KEY or GOOGLE_API_KEY) */
-  apiKey?: string;
-  /** Override model name (default: GEMINI_MODEL from env) */
-  model?: string;
+  /** Prompts service for DI (default: defaultPromptsService) */
+  promptsService?: IPromptsService;
+  /** LLM service for DI (default: GeminiLlmService with recipeDetailsZodSchema) */
+  llmService?: IRecipeDetailsLlm;
 }
 
 /**
  * Recipe-details chain: context → prompt (URL or web search) → LLM with structured output → RecipeDetailsResponse.
- * Uses LangChain ChatGoogleGenerativeAI + withStructuredOutput(recipeDetailsZodSchema).
- * Model is read from GEMINI_MODEL (validated at startup via instrumentation).
+ * Uses PromptsService and IRecipeDetailsLlm via DI.
  */
 export class RecipeDetailsChain {
-  private readonly options: RecipeDetailsChainOptions;
-  private llm: Runnable<BaseLanguageModelInput, RecipeDetailsResponse> | null = null;
+  private readonly promptsService: IPromptsService;
+  private readonly llmService: IRecipeDetailsLlm;
 
   constructor(options: RecipeDetailsChainOptions = {}) {
-    this.options = options;
-  }
-
-  private getApiKey(): string {
-    const key = this.options.apiKey ?? process.env.GEMINI_API_KEY ?? process.env.GOOGLE_API_KEY;
-    if (!key) {
-      throw new Error(
-        "Missing GEMINI_API_KEY or GOOGLE_API_KEY. Set one in .env.local or pass apiKey in options."
-      );
-    }
-    return key;
-  }
-
-  private getModel(): string {
-    const model = this.options.model ?? process.env.GEMINI_MODEL;
-    if (!model) {
-      throw new Error(
-        "Missing GEMINI_MODEL. Set in .env.local (e.g. gemini-2.5-flash-lite) or pass model in options."
-      );
-    }
-    return model;
-  }
-
-  private getLlm(): Runnable<BaseLanguageModelInput, RecipeDetailsResponse> {
-    if (!this.llm) {
-      const model = this.getModel();
-      const base = new ChatGoogleGenerativeAI({
-        model,
-        temperature: 0,
-        apiKey: this.getApiKey(),
-      });
-      this.llm = base.withStructuredOutput(recipeDetailsZodSchema, {
-        name: "RecipeDetails",
-      }) as Runnable<BaseLanguageModelInput, RecipeDetailsResponse>;
-    }
-    return this.llm;
+    this.promptsService = options.promptsService ?? defaultPromptsService;
+    this.llmService = options.llmService ?? defaultLlm;
   }
 
   /**
@@ -77,21 +49,16 @@ export class RecipeDetailsChain {
     const promptType = context.url
       ? PromptType.RECIPE_URL_EXTRACTION
       : PromptType.RECIPE_WEB_SEARCH;
-    validatePromptContext(promptType, context);
-    const promptText = getPrompt(promptType, context);
-
-    const result = await this.getLlm().invoke([new HumanMessage(promptText)]);
-    return recipeDetailsZodSchema.parse(result) as RecipeDetailsResponse;
+    const messages = await this.promptsService.getPromptMessages(promptType, context);
+    return this.llmService.generate(messages);
   }
 
   private async runPrompt(
     promptType: PromptType,
     context: RecipeContext
   ): Promise<RecipeDetailsResponse> {
-    validatePromptContext(promptType, context);
-    const promptText = getPrompt(promptType, context);
-    const result = await this.getLlm().invoke([new HumanMessage(promptText)]);
-    return recipeDetailsZodSchema.parse(result) as RecipeDetailsResponse;
+    const messages = await this.promptsService.getPromptMessages(promptType, context);
+    return this.llmService.generate(messages);
   }
 
   /**
@@ -109,19 +76,5 @@ export class RecipeDetailsChain {
   }
 }
 
-/** Default singleton for app use (shared LLM instance). */
+/** Default singleton for app use. */
 export const recipeDetailsChain = new RecipeDetailsChain();
-
-/** Run chain (no fallback). Uses default singleton. */
-export async function runRecipeDetailsChain(
-  context: RecipeContext
-): Promise<RecipeDetailsResponse> {
-  return recipeDetailsChain.run(context);
-}
-
-/** Run with URL-first fallback. Uses default singleton. */
-export async function runRecipeDetailsChainWithFallback(
-  context: RecipeContext
-): Promise<RecipeDetailsResponse> {
-  return recipeDetailsChain.runWithFallback(context);
-}
