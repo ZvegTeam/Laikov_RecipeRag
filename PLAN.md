@@ -333,10 +333,10 @@ Integrate [LangChain](https://js.langchain.com/) to standardize prompt managemen
 - [x] Keep `validatePromptContext()` (or equivalent) for input validation before running the chain.
 
 #### 6.3 Structured output (Gemini) via LangChain
-- [ ] Replace hand-rolled `lib/gemini.ts` structured flow where used by recipe-details:
-  - [ ] Use ChatGoogleGenerativeAI (or LangChain’s Gemini integration) with `withStructuredOutput(recipeDetailsZodSchema)` (or equivalent).
-  - [ ] Single place for “call Gemini and get typed, validated object”; remove or simplify custom `generateStructuredContent` + manual schema conversion for this use case.
-- [ ] Ensure Zod schema remains the single source of truth for response shape.
+- [x] Replace hand-rolled `lib/gemini.ts` structured flow where used by recipe-details:
+  - [x] Use ChatGoogleGenerativeAI (or LangChain’s Gemini integration) with `withStructuredOutput(recipeDetailsZodSchema)` (or equivalent).
+  - [x] Single place for “call Gemini and get typed, validated object”; remove or simplify custom `generateStructuredContent` + manual schema conversion for this use case.
+- [x] Ensure Zod schema remains the single source of truth for response shape.
 
 #### 6.4 Retriever abstraction (optional)
 - [ ] Implement a LangChain `Retriever` that wraps existing search:
