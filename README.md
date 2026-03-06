@@ -1,15 +1,144 @@
 # Recipe Search Application
 
-A web application that allows users to find recipes based on a list of ingredients using vector similarity search powered by pgvector and Gemini AI embeddings.
+A web application that finds recipes by ingredients using vector similarity search (pgvector), local transformer embeddings, and LangChain with Gemini AI for recipe details extraction.
 
 ## Tech Stack
 
-- **Frontend**: Next.js 14+ (App Router) + Mantine UI
-- **Backend**: Supabase (PostgreSQL with pgvector extension)
-- **AI/Embeddings**: Google Gemini AI (for generating embeddings)
-- **Package Manager**: Bun
-- **Linter/Formatter**: Biome
-- **Data**: JSON file with recipe objects
+### Frontend
+| Technology | Purpose |
+|------------|---------|
+| **Next.js 14** (App Router) | React framework, server components, API routes |
+| **Mantine UI** | Component library (forms, cards, modals, layout) |
+| **Lucide React** | Icons |
+| **React 18** | UI rendering |
+
+### Backend & Data
+| Technology | Purpose |
+|------------|---------|
+| **PostgreSQL** (Supabase) | Primary database |
+| **Drizzle ORM** | Type-safe query builder, schema, migrations |
+| **pgvector** | Vector similarity search |
+| **Supabase** | Managed PostgreSQL, local dev via Supabase CLI |
+
+### AI & Embeddings
+| Technology | Purpose |
+|------------|---------|
+| **@xenova/transformers** | Local embedding generation (no API calls), model: `Xenova/all-MiniLM-L6-v2` (384 dimensions) |
+| **LangChain** (`@langchain/core`) | Prompt templates, chains, retriever abstraction |
+| **@langchain/google-genai** | Gemini integration (ChatGoogleGenerativeAI, structured output) |
+| **Google Gemini** | Recipe details extraction (cooking instructions from URL or web search) |
+
+### Vector Search Pipeline
+| Component | Purpose |
+|-----------|---------|
+| **Binary quantization** | Float embeddings → sign bits (bit 384), reduces storage and enables Hamming distance |
+| **HNSW index** | Approximate nearest neighbor search (bit_hamming_ops) |
+| **Embedding cache** | In-memory + DB (hstore) cache for search query embeddings, TTL 5 min |
+
+### Validation & Quality
+| Technology | Purpose |
+|------------|---------|
+| **Zod** | Request/response validation, schema definitions |
+| **zod-to-json-schema** | Structured output schema for Gemini |
+| **Biome** | Linting, formatting, pre-commit hooks |
+
+### Tooling
+| Technology | Purpose |
+|------------|---------|
+| **Bun** | Package manager, script runner |
+| **TypeScript** | Static typing |
+| **Node-loader** | Load @xenova/transformers in Next.js |
+
+---
+
+## Application Flows
+
+### 1. Recipe Search Flow
+
+**Trigger:** User enters ingredients and submits search.
+
+| Step | Instrument | Description |
+|------|------------|-------------|
+| 1 | `SearchForm` | Collects ingredients (textarea), validates, calls `POST /api/search` |
+| 2 | `POST /api/search` | Validates body (Zod), delegates to `searchRecipesByQuery` |
+| 3 | `searchRecipesByQuery` | Builds query text → checks embedding cache → `generateEmbedding` if miss |
+| 4 | `generateEmbedding` | @xenova/transformers pipeline (all-MiniLM-L6-v2), mean pooling, normalize |
+| 5 | `binaryQuantize` | Float[384] → bit string (sign quantization) |
+| 6 | Drizzle + raw SQL | `SELECT ... ORDER BY embedding <~> queryBit LIMIT n`, HNSW Hamming |
+| 7 | Response | Recipes with similarity scores |
+
+**Output:** JSON with `recipes` array and `count`.
+
+---
+
+### 2. Recipe Details Flow
+
+**Trigger:** User clicks "View Details" on a recipe card.
+
+| Step | Instrument | Description |
+|------|-------------|-------------|
+| 1 | `RecipeDetails` | Fetches `POST /api/recipe-details` with `recipeId` or `recipeUrl` |
+| 2 | `rateLimit` | 10 req/min per IP |
+| 3 | `getRecipeForDetails` | Loads recipe from DB by id or url |
+| 4 | Cache check | If `cooking_instructions` and `instructions_fetched_at` exist → return cached |
+| 5 | `fetchAndSaveRecipeDetails` | `recipeDetailsChain.runWithFallback(context)` |
+| 6 | `RecipeDetailsChain` | PromptsService → GeminiLlmService (withStructuredOutput) |
+| 7 | PromptsService | Picks prompt: URL extraction (if url) or web search; LangChain ChatPromptTemplate |
+| 8 | GeminiLlmService | ChatGoogleGenerativeAI + recipeDetailsZodSchema → typed response |
+| 9 | Fallback | URL extraction fails → web search prompt |
+| 10 | DB update | Persist `cooking_instructions`, `additional_info`, `instructions_fetched_at` |
+| 11 | Response | `cooking_instructions`, `additional_info`, `cached`, `fetched_at` |
+
+**Output:** Cooking instructions and additional info (tips, variations, etc.).
+
+---
+
+### 3. RAG Chain Flow (Recipe Q&A)
+
+**Trigger:** Programmatic use of `RecipeRagChain` (e.g. "What can I make with chicken and garlic?").
+
+| Step | Instrument | Description |
+|------|-------------|-------------|
+| 1 | `RecipeRagChain.run(query)` | Retrieves docs, formats context, calls LLM |
+| 2 | `RecipeRetriever` | LangChain BaseRetriever, `invoke(query)` |
+| 3 | `searchRecipesByQuery` | Same pipeline as flow 1 (embed → quantize → pgvector) |
+| 4 | Document conversion | Recipes → LangChain `Document[]` (pageContent, metadata) |
+| 5 | `PromptsService.getStaticPrompt` | RECIPE_RAG_SYSTEM prompt from templates |
+| 6 | `GeminiLlmService` | Raw text mode (no schema), generates answer |
+| 7 | Response | Concise answer with recipe names when relevant |
+
+**Output:** String answer. Used for future features (e.g. natural-language recipe discovery).
+
+---
+
+### 4. Data Vectorization Flow
+
+**Trigger:** `bun run vectorize recipes-parsed.json` (offline script).
+
+| Step | Instrument | Description |
+|------|-------------|-------------|
+| 1 | `parse-json.ts` | Parse MongoDB JSON → normalized ParsedRecipe |
+| 2 | `vectorize-data.ts` | Batch process, skip existing recipe IDs (resume) |
+| 3 | `generateEmbedding` | Per recipe: `name + ingredients + description` → float[384] |
+| 4 | `binaryQuantize` | Float → bit string |
+| 5 | Drizzle | Insert into `recipes` and `recipe_embeddings` |
+
+**Output:** Populated `recipes` and `recipe_embeddings` tables.
+
+---
+
+### 5. Embedding Cache Flow
+
+**Trigger:** Search queries (flow 1).
+
+| Step | Instrument | Description |
+|------|-------------|-------------|
+| 1 | `embeddingCacheService.get(cacheKey)` | Check DB (hstore) for cached embedding |
+| 2 | Cache hit | Return cached float[]; skip `generateEmbedding` |
+| 3 | Cache miss | `generateEmbedding` → `set(cacheKey, embedding)` (async, fire-and-forget) |
+| 4 | Cron | `delete_expired_embedding_cache()` to prune TTL-expired entries |
+
+---
 
 ## Getting Started
 
@@ -84,32 +213,26 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 ## Environment Variables
 
-Copy `.env.local.example` to `.env.local` and fill in your values:
+Copy `.env.example` to `.env.local` and fill in your values:
 
 ```bash
-cp .env.local.example .env.local
+cp .env.example .env.local
 ```
 
 Required environment variables:
 
 ```
-NEXT_PUBLIC_SUPABASE_URL=your_supabase_url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your_supabase_anon_key
-SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+DATABASE_URL=postgresql://...
 GEMINI_API_KEY=your_gemini_api_key
+GEMINI_MODEL=gemini-2.5-flash-lite
 ```
 
-**For local development**, use the values from `bun run supabase:status` (or `supabase status`):
+**For local development**, use the values from `bun run supabase:status`:
 ```
-NEXT_PUBLIC_SUPABASE_URL=http://127.0.0.1:55321
-NEXT_PUBLIC_SUPABASE_ANON_KEY=<from supabase status>
-SUPABASE_SERVICE_ROLE_KEY=<from supabase status>
+DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55322/postgres
 ```
 
-**For production**, get these values from:
-- **Supabase**: Project Settings → API
-
-Note: Embeddings are generated locally using @xenova/transformers - no external API keys needed!
+**Note:** Embeddings are generated locally using @xenova/transformers — no API keys needed for search. Gemini is only used for recipe details extraction.
 
 ## Scripts
 
@@ -132,7 +255,10 @@ Note: Embeddings are generated locally using @xenova/transformers - no external 
 - `bun run supabase:reset` - Reset local database and run migrations
 - `bun run supabase:migrate` - Reset database and apply all migrations
 
+### Data
+- `bun run parse:json` - Parse MongoDB JSON to normalized format
+- `bun run vectorize` - Vectorize parsed recipes (e.g. `bun run vectorize recipes-parsed.json`)
+
 ## Project Structure
 
-See [PLAN.md](./PLAN.md) for detailed implementation plan and project structure.
-
+See [PLAN.md](./PLAN.md) for detailed implementation plan and architecture.
