@@ -339,12 +339,12 @@ Integrate [LangChain](https://js.langchain.com/) to standardize prompt managemen
 - [x] Ensure Zod schema remains the single source of truth for response shape.
 
 #### 6.4 Retriever abstraction (optional)
-- [ ] Implement a LangChain `Retriever` that wraps existing search:
-  - [ ] Input: user message (e.g. ingredients string).
-  - [ ] Internal steps: run current flow (embed query → binary quantize → Drizzle/pgvector) and return recipe documents.
-  - [ ] Output: LangChain `Document[]` (or equivalent) for use in chains.
-- [ ] Use this retriever in a RAG chain when adding features such as:
-  - [ ] “Given ingredients, retrieve top N recipes and summarize” or “What can I make with X?” using retrieved recipes as context.
+- [x] Implement a LangChain `Retriever` that wraps existing search:
+  - [x] Input: user message (e.g. ingredients string).
+  - [x] Internal steps: run current flow (embed query → binary quantize → Drizzle/pgvector) and return recipe documents.
+  - [x] Output: LangChain `Document[]` (or equivalent) for use in chains.
+- [x] Use this retriever in a RAG chain when adding features such as:
+  - [x] “Given ingredients, retrieve top N recipes and summarize” or “What can I make with X?” using retrieved recipes as context.
 
 #### 6.5 Document loaders (future)
 - [ ] When adding ingestion from URLs or PDFs:

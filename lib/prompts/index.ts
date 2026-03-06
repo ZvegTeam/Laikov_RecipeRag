@@ -74,6 +74,9 @@ export class PromptsService {
         break;
       case PromptType.RECIPE_WEB_SEARCH:
         break;
+      case PromptType.RECIPE_RAG_SYSTEM:
+        // No context required
+        return;
       default:
         throw new Error(`Unknown prompt type: ${type}`);
     }
@@ -103,6 +106,9 @@ export class PromptsService {
         url,
       });
     }
+    if (type === PromptType.RECIPE_RAG_SYSTEM) {
+      return template.formatMessages({});
+    }
     return template.formatMessages({
       recipeName: context.recipeName,
       ingredients: context.ingredients,
@@ -112,6 +118,17 @@ export class PromptsService {
   /** Get prompt text by type (for backward compatibility or non-chain use) */
   static async getPrompt(type: PromptType, context: RecipeContext): Promise<string> {
     const messages = await PromptsService.getPromptMessages(type, context);
+    const content = messages[0]?.content;
+    return typeof content === "string" ? content : String(content ?? "");
+  }
+
+  /** Get static prompt text (no context required). For RECIPE_RAG_SYSTEM and similar. */
+  static async getStaticPrompt(type: PromptType.RECIPE_RAG_SYSTEM): Promise<string> {
+    const template = promptTemplates[type];
+    if (!template) {
+      throw new Error(`Unknown prompt type: ${type}`);
+    }
+    const messages = await template.formatMessages({});
     const content = messages[0]?.content;
     return typeof content === "string" ? content : String(content ?? "");
   }

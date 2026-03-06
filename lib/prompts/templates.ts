@@ -37,7 +37,13 @@ Find and provide:
 You MUST return a valid JSON object that matches the provided JSON schema exactly. The response must be valid JSON only, without any markdown formatting or additional text.`
 );
 
+const RECIPE_RAG_SYSTEM_TEMPLATE = ChatPromptTemplate.fromTemplate(
+  `You are a helpful recipe assistant. Given retrieved recipes, answer the user's question concisely.
+List recipe names when relevant. Keep responses brief and practical.`
+);
+
 export const promptTemplates: Record<PromptType, ChatPromptTemplate> = {
   [PromptType.RECIPE_URL_EXTRACTION]: RECIPE_URL_EXTRACTION_TEMPLATE,
   [PromptType.RECIPE_WEB_SEARCH]: RECIPE_WEB_SEARCH_TEMPLATE,
+  [PromptType.RECIPE_RAG_SYSTEM]: RECIPE_RAG_SYSTEM_TEMPLATE,
 };

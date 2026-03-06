@@ -1,9 +1,4 @@
-import { db } from "@/lib/db";
-import { embeddingCacheService } from "@/lib/embedding-cache";
-import { generateEmbedding } from "@/lib/embeddings";
-import { binaryQuantize } from "@/lib/quantize";
-import type { Recipe } from "@/types/recipe";
-import { sql } from "drizzle-orm";
+import { searchRecipesByQuery } from "@/lib/search";
 import { type NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 
@@ -32,31 +27,7 @@ export async function POST(request: NextRequest) {
     const queryText = `Find recipes with these ingredients: ${ingredients.join(", ")}`;
     const cacheKey = getEmbeddingCacheKey(ingredients);
 
-    let queryEmbedding = await embeddingCacheService.get(cacheKey);
-    if (!queryEmbedding) {
-      queryEmbedding = await generateEmbedding(queryText);
-      void embeddingCacheService.set(cacheKey, queryEmbedding);
-    }
-
-    const queryBit = binaryQuantize(queryEmbedding);
-
-    const result = await db.execute(
-      sql`
-        SELECT
-          r.id, r.original_id, r.name, r.ingredients, r.description, r.url, r.image,
-          r.cook_time, r.prep_time, r.recipe_yield, r.date_published, r.source,
-          r.cooking_instructions, r.additional_info, r.instructions_fetched_at,
-          r.created_at, r.updated_at,
-          (1 - ((e.embedding <~> ${queryBit}::bit(384)) / 384.0)) AS similarity
-        FROM recipes r
-        INNER JOIN recipe_embeddings e ON e.recipe_id = r.id
-        ORDER BY e.embedding <~> ${queryBit}::bit(384)
-        LIMIT ${limit}
-      `
-    );
-
-    const rows = Array.isArray(result) ? result : ((result as { rows?: unknown[] }).rows ?? []);
-    const recipesList = rows as (Recipe & { similarity: number })[];
+    const recipesList = await searchRecipesByQuery(queryText, { limit, cacheKey });
 
     return NextResponse.json({
       recipes: recipesList,
