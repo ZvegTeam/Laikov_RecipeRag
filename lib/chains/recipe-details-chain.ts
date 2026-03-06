@@ -77,4 +77,4 @@ export class RecipeDetailsChain {
 }
 
 /** Default singleton for app use. */
-export const recipeDetailsChain = new RecipeDetailsChain();
+export const DefaultRecipeDetailsChain = new RecipeDetailsChain();

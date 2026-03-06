@@ -9,11 +9,7 @@ import { join } from "node:path";
 import { inArray, sql } from "drizzle-orm";
 import { db } from "../lib/db";
 import { recipeEmbeddings, recipes } from "../lib/db/schema";
-import {
-  generateEmbeddingsBatch,
-  getEmbeddingDimension,
-  prepareTextForEmbedding,
-} from "../lib/embeddings";
+import { LocalTransformersEmbeddings } from "../lib/embeddings";
 import { binaryQuantize } from "../lib/quantize";
 import type { ParsedRecipe } from "../types/recipe";
 
@@ -153,7 +149,7 @@ async function main() {
   console.log(`Embedding batch size: ${embeddingBatchSize}`);
   console.log(`Embedding model: ${embeddingModel}`);
   console.log(
-    `Embedding dimension: ${getEmbeddingDimension(embeddingModel)} (binary quantized to bit(384))`
+    `Embedding dimension: ${LocalTransformersEmbeddings.getDimension(embeddingModel)} (binary quantized to bit(384))`
   );
   console.log(`Skip embeddings: ${skipEmbeddings}`);
   console.log("=".repeat(60));
@@ -180,6 +176,8 @@ async function main() {
   console.log(`Processing mode: ${config.isLocal ? "Local" : "Remote"}`);
   console.log(`Batch size: ${batchSize} recipes per batch\n`);
 
+  const embeddingsInstance = new LocalTransformersEmbeddings(embeddingModel, embeddingBatchSize);
+
   let totalSuccess = 0;
   let totalFailed = 0;
 
@@ -194,8 +192,8 @@ async function main() {
       let batchWithEmbeddings: RecipeWithEmbedding[] = batch;
 
       if (!skipEmbeddings) {
-        const texts = batch.map((recipe) => prepareTextForEmbedding(recipe));
-        const embeddings = await generateEmbeddingsBatch(texts, embeddingModel, embeddingBatchSize);
+        const texts = batch.map((recipe) => LocalTransformersEmbeddings.prepareText(recipe));
+        const embeddings = await embeddingsInstance.embedDocuments(texts);
         batchWithEmbeddings = batch.map((recipe, index) => ({
           ...recipe,
           embedding: embeddings[index] || undefined,

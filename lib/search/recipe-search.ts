@@ -5,7 +5,7 @@
 
 import { db } from "@/lib/db";
 import { embeddingCacheService } from "@/lib/embedding-cache";
-import { generateEmbedding } from "@/lib/embeddings";
+import { RecipeEmbeddings } from "@/lib/embeddings";
 import { binaryQuantize } from "@/lib/quantize";
 import type { Recipe } from "@/types/recipe";
 import { sql } from "drizzle-orm";
@@ -34,7 +34,7 @@ export async function searchRecipesByQuery(
 
   let queryEmbedding = await embeddingCacheService.get(cacheKey);
   if (!queryEmbedding) {
-    queryEmbedding = await generateEmbedding(queryText);
+    queryEmbedding = await RecipeEmbeddings.embedQuery(queryText);
     void embeddingCacheService.set(cacheKey, queryEmbedding);
   }
 

@@ -353,10 +353,10 @@ Integrate [LangChain](https://js.langchain.com/) to standardize prompt managemen
   - [ ] LangChain owns “URL/PDF → documents/chunks”; existing DB and indexing unchanged.
 
 #### 6.6 Embeddings via LangChain (optional)
-- [ ] If standardizing on LangChain’s embedding interface:
-  - [ ] Use `HuggingFaceTransformersEmbeddings` (or equivalent) for the “text → vector” step only.
-  - [ ] Keep Drizzle + pgvector and current binary quantization logic; ensure dimension stays 384 and quantization remains correct.
-- [ ] Only adopt if the goal is to reduce custom pipeline code and accept possible model/API differences.
+- [x] If standardizing on LangChain’s embedding interface:
+  - [x] Use `HuggingFaceTransformersEmbeddings` (or equivalent) for the “text → vector” step only.
+  - [x] Keep Drizzle + pgvector and current binary quantization logic; ensure dimension stays 384 and quantization remains correct.
+- [x] Only adopt if the goal is to reduce custom pipeline code and accept possible model/API differences.
 
 #### 6.7 Agents / tools (future)
 - [ ] When adding features like “substitute ingredient”, “scale recipe”, or “find similar recipes”:

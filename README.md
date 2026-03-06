@@ -81,7 +81,7 @@ A web application that finds recipes by ingredients using vector similarity sear
 | 2 | `rateLimit` | 10 req/min per IP |
 | 3 | `getRecipeForDetails` | Loads recipe from DB by id or url |
 | 4 | Cache check | If `cooking_instructions` and `instructions_fetched_at` exist → return cached |
-| 5 | `fetchAndSaveRecipeDetails` | `recipeDetailsChain.runWithFallback(context)` |
+| 5 | `fetchAndSaveRecipeDetails` | `DefaultRecipeDetailsChain.runWithFallback(context)` |
 | 6 | `RecipeDetailsChain` | PromptsService → GeminiLlmService (withStructuredOutput) |
 | 7 | PromptsService | Picks prompt: URL extraction (if url) or web search; LangChain ChatPromptTemplate |
 | 8 | GeminiLlmService | ChatGoogleGenerativeAI + recipeDetailsZodSchema → typed response |
