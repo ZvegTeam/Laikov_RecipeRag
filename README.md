@@ -219,20 +219,34 @@ Copy `.env.example` to `.env.local` and fill in your values:
 cp .env.example .env.local
 ```
 
-Required environment variables:
+See `.env.example` for inline comments. Summary:
 
-```
-DATABASE_URL=postgresql://...
-GEMINI_API_KEY=your_gemini_api_key
-GEMINI_MODEL=gemini-2.5-flash-lite
-```
+### Core app (validated in `lib/env.ts` via `serverEnv`)
 
-**For local development**, use the values from `bun run supabase:status`:
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `DATABASE_URL` | Yes | Postgres connection string (Drizzle, embedding cache, search) |
+| `GEMINI_API_KEY` | Yes | Google Gemini API key for recipe-details LLM |
+| `GEMINI_MODEL` | Yes | Gemini model id (e.g. `gemini-2.5-flash-lite`, `gemini-2.0-flash`) |
+
+**Local Postgres example** (after `bun run supabase:start`, if DB is on port `55322`):
+
 ```
 DATABASE_URL=postgresql://postgres:postgres@127.0.0.1:55322/postgres
 ```
 
-**Note:** Embeddings are generated locally using @xenova/transformers — no API keys needed for search. Gemini is only used for recipe details extraction.
+### Main page password gate (`lib/auth/main-access.ts`)
+
+The homepage shows a password form until a valid login sets an HTTP-only cookie. Set both variables below.
+
+| Variable | Required | Purpose |
+|----------|----------|---------|
+| `ACCESS_PASSWORD_HASH` | Yes (for gate) | Scrypt hash of the site password, format `scrypt$<salt_hex>$<hash_hex>` |
+| `ACCESS_COOKIE_SECRET` | Yes (for gate) | Secret used to sign the session cookie (e.g. `openssl rand -base64 32`) |
+
+Generate a hash (one-liner in `.env.example`). **In `.env.local`, escape `$` as `\$`** so Next.js / dotenv does not treat them as variable interpolation (otherwise the hash is truncated).
+
+**Note:** Embeddings are generated locally with `@xenova/transformers` — no API keys needed for search. Gemini is only used for recipe details extraction.
 
 ## Scripts
 
