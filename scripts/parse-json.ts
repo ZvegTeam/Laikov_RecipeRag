@@ -85,7 +85,7 @@ function parseRecipe(mongoRecipe: MongoRecipe): ParsedRecipe | null {
       cook_time: mongoRecipe.cookTime?.trim(),
       prep_time: mongoRecipe.prepTime?.trim(),
       recipe_yield: mongoRecipe.recipeYield?.trim(),
-      date_published,
+      date_published: date_published?.toISOString(),
       source: mongoRecipe.source?.trim(),
     };
 
