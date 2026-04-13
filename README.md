@@ -241,7 +241,7 @@ The homepage shows a password form until a valid login sets an HTTP-only cookie.
 
 | Variable | Required | Purpose |
 |----------|----------|---------|
-| `ACCESS_PASSWORD_HASH` | Yes (for gate) | Scrypt hash of the site password, format `scrypt$<salt_hex>$<hash_hex>` |
+| `ACCESS_PASSWORD` | Yes (for gate) | sSecret password |
 | `ACCESS_COOKIE_SECRET` | Yes (for gate) | Secret used to sign the session cookie (e.g. `openssl rand -base64 32`) |
 
 Generate a hash (one-liner in `.env.example`). **In `.env.local`, escape `$` as `\$`** so Next.js / dotenv does not treat them as variable interpolation (otherwise the hash is truncated).
@@ -276,3 +276,10 @@ Generate a hash (one-liner in `.env.example`). **In `.env.local`, escape `$` as 
 ## Project Structure
 
 See [PLAN.md](./PLAN.md) for detailed implementation plan and architecture.
+
+psql \
+  --single-transaction \
+  --variable ON_ERROR_STOP=1 \
+  --command 'SET session_replication_role = replica' \
+  --file data.sql \
+  --dbname postgresql://postgres.olazrdhwgikuicxwmsvr:qjxmQDg0QVEpB2o1@aws-0-eu-west-1.pooler.supabase.com:5432/postgres

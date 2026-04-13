@@ -11,21 +11,13 @@ function getRequiredEnv(name: string): string {
 }
 
 /**
- * Expected ACCESS_PASSWORD_HASH format:
+ * Expected ACCESS_PASSWORD format:
  * scrypt$<salt_hex>$<hash_hex>
  */
 export function verifyMainAccessPassword(password: string): boolean {
-  const rawHash = getRequiredEnv("ACCESS_PASSWORD_HASH");
-  const [algo, saltHex, expectedHashHex] = rawHash.split("$");
-  if (algo !== "scrypt" || !saltHex || !expectedHashHex) {
-    throw new Error("Invalid ACCESS_PASSWORD_HASH format. Expected: scrypt$<salt_hex>$<hash_hex>");
-  }
+  const accessPassword = getRequiredEnv("ACCESS_PASSWORD");
 
-  const salt = Buffer.from(saltHex, "hex");
-  const expectedHash = Buffer.from(expectedHashHex, "hex");
-  const actualHash = scryptSync(password, salt, expectedHash.length);
-
-  return timingSafeEqual(actualHash, expectedHash);
+  return password === accessPassword;
 }
 
 function signToken(payload: string): string {
