@@ -7,7 +7,15 @@
   },
   "files": {
     "ignoreUnknown": false,
-    "ignore": ["node_modules", ".next", "out", "build", "dist", "recipeitems-latest.json"],
+    "ignore": [
+      "node_modules",
+      ".next",
+      "out",
+      "build",
+      "dist",
+      "recipeitems-latest.json",
+      "recipes-parsed.json"
+    ],
     "maxSize": 10485760
   },
   "formatter": {

@@ -8,24 +8,52 @@
     "start": "next start",
     "lint": "biome check .",
     "lint:fix": "biome check --write .",
-    "format": "biome format --write ."
+    "format": "biome format --write .",
+    "supabase": "supabase",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:status": "supabase status",
+    "supabase:reset": "supabase db reset",
+    "supabase:migrate": "supabase db reset",
+    "supabase:init": "supabase init",
+    "parse:json": "bun scripts/parse-json.ts",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
+    "vectorize": "bun scripts/vectorize-data.ts",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*": ["bun lint:fix", "bun format"]
   },
   "dependencies": {
+    "@langchain/core": "^1.1.27",
+    "@langchain/google-genai": "^2.1.20",
+    "@mantine/core": "^7.14.0",
+    "@mantine/form": "^7.14.0",
+    "@mantine/hooks": "^7.14.0",
+    "drizzle-orm": "^0.45.1",
+    "lucide-react": "^0.563.0",
+    "next": "^14.2.0",
+    "pg": "^8.18.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1",
-    "next": "^14.2.0",
-    "@mantine/core": "^7.14.0",
-    "@mantine/hooks": "^7.14.0",
-    "@mantine/form": "^7.14.0",
-    "@supabase/supabase-js": "^2.45.4",
-    "@google/generative-ai": "^0.21.0",
-    "zod": "^3.23.8"
+    "zod": "^3.23.8",
+    "zod-to-json-schema": "^3.25.1"
   },
   "devDependencies": {
     "@biomejs/biome": "^1.9.4",
-    "typescript": "^5.6.2",
     "@types/node": "^22.5.0",
+    "@types/pg": "^8.16.0",
     "@types/react": "^18.3.5",
-    "@types/react-dom": "^18.3.0"
+    "@types/react-dom": "^18.3.0",
+    "@xenova/transformers": "^2.17.2",
+    "drizzle-kit": "^0.31.9",
+    "husky": "^9.1.7",
+    "lint-staged": "^16.4.0",
+    "node-loader": "^2.1.0",
+    "supabase": "^2.89.1",
+    "typescript": "^5.6.2"
   }
 }
