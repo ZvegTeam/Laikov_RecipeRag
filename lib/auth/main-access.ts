@@ -1,4 +1,4 @@
-import { createHmac, randomBytes, scryptSync, timingSafeEqual } from "node:crypto";
+import { createHmac, randomBytes, timingSafeEqual } from "node:crypto";
 
 export const MAIN_ACCESS_COOKIE_NAME = "main_access";
 
@@ -10,10 +10,7 @@ function getRequiredEnv(name: string): string {
   return value;
 }
 
-/**
- * Expected ACCESS_PASSWORD format:
- * scrypt$<salt_hex>$<hash_hex>
- */
+/** Validates plaintext password from ACCESS_PASSWORD env variable. */
 export function verifyMainAccessPassword(password: string): boolean {
   const accessPassword = getRequiredEnv("ACCESS_PASSWORD");
 
